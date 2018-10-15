@@ -20,8 +20,37 @@
 
 package main
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/mininghq/miner-controller/src/caps"
+)
 
 func main() {
 	fmt.Println("Initial commit")
+
+	memory, err := caps.GetMemoryInfo()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(memory)
+
+	cpus, err := caps.GetCPUInfo()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(cpus)
+
+	host, err := caps.GetHostInfo()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(host)
+
+	gpus, err := caps.GetGPUInfo()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(gpus)
+
 }
