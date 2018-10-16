@@ -32,10 +32,20 @@ func GetGPUInfo() ([]GPUInfo, error) {
 	}
 
 	for _, card := range gpu.GraphicsCards {
+		vendor := "Unknown"
+		product := "Invalid"
+		if card.DeviceInfo != nil {
+			if card.DeviceInfo.Vendor != nil {
+				vendor = card.DeviceInfo.Vendor.Name
+			}
+			if card.DeviceInfo.Product != nil {
+				product = card.DeviceInfo.Product.Name
+			}
+		}
 		gpuInfos = append(gpuInfos, GPUInfo{
 			ID:      uint32(card.Index),
-			Vendor:  card.DeviceInfo.Vendor.Name,
-			Product: card.DeviceInfo.Product.Name,
+			Vendor:  vendor,
+			Product: product,
 		})
 	}
 	return gpuInfos, nil
