@@ -11,15 +11,25 @@ type GPUInfo struct {
 	ID      uint32
 	Vendor  string
 	Product string
+	Compute GPUComputeInfo
+}
+
+// GPUComputeInfo contains information about OpenCL and CUDA capabilities
+type GPUComputeInfo struct {
+	// Platform can either be `cuda`, `opencl` or `unsupported`
+	Platform string
+	// The version/level of CUDA or OpenCL supported by this device, if any
+	Version string `json:",omitempty"`
 }
 
 // String converts GPUInfo into a readable string
 func (gpu GPUInfo) String() string {
 	return fmt.Sprintf(
-		"GPU #%d, Vendor: %s, Product: %s",
+		"GPU #%d, Vendor: %s, Product: %s, Compute %s",
 		gpu.ID,
 		gpu.Vendor,
-		gpu.Product)
+		gpu.Product,
+		gpu.Compute)
 }
 
 // GetGPUInfo returns the installed GPUs in the system
@@ -46,6 +56,11 @@ func GetGPUInfo() ([]GPUInfo, error) {
 			ID:      uint32(card.Index),
 			Vendor:  vendor,
 			Product: product,
+			// TODO TEMP Just shown for testing before actual implementation
+			Compute: GPUComputeInfo{
+				Platform: "unsupported",
+				//Version:  "",
+			},
 		})
 	}
 	return gpuInfos, nil
