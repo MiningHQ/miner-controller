@@ -21,6 +21,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/mininghq/miner-controller/src/caps"
@@ -29,28 +30,18 @@ import (
 func main() {
 	fmt.Println("Initial commit")
 
-	memory, err := caps.GetMemoryInfo()
+	systemInfo, err := caps.GetSystemInfo()
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(memory)
 
-	cpus, err := caps.GetCPUInfo()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(cpus)
+	fmt.Println(systemInfo)
 
-	host, err := caps.GetHostInfo()
+	jsonBytes, err := json.Marshal(systemInfo)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(host)
 
-	gpus, err := caps.GetGPUInfo()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(gpus)
+	fmt.Println(string(jsonBytes))
 
 }
