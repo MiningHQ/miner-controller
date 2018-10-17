@@ -21,10 +21,10 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/mininghq/miner-controller/src/caps"
+	"github.com/mininghq/miner-controller/src/mhq"
 )
 
 func main() {
@@ -35,13 +35,22 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(systemInfo)
-
-	jsonBytes, err := json.Marshal(systemInfo)
+	mhqClient, err := mhq.NewClient("http://mininghq.local/api")
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println(string(jsonBytes))
+	recommendedMiners, err := mhqClient.GetRecommendedMiners(systemInfo)
+	if err != nil {
+		panic(err)
+	}
+
+	for i, recommendedMiner := range recommendedMiners {
+		fmt.Printf("Recommended miner #%d: %s v%s (%s)\n",
+			i,
+			recommendedMiner.Name,
+			recommendedMiner.Version,
+			recommendedMiner.Type)
+	}
 
 }
