@@ -21,10 +21,14 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"time"
 
-	"github.com/mininghq/miner-controller/src/caps"
-	"github.com/mininghq/miner-controller/src/mhq"
+	"github.com/donovansolms/mininghq-miner-controller/src/caps"
+	"github.com/donovansolms/mininghq-miner-controller/src/mhq"
+	pb "gopkg.in/cheggaaa/pb.v1"
 )
 
 func main() {
@@ -46,11 +50,43 @@ func main() {
 	}
 
 	for i, recommendedMiner := range recommendedMiners {
-		fmt.Printf("Recommended miner #%d: %s v%s (%s)\n",
+		fmt.Printf("Downloading miner #%d: %s v%s (%s)\n",
 			i,
 			recommendedMiner.Name,
 			recommendedMiner.Version,
 			recommendedMiner.Type)
+
+		// TODO TEMP
+		tempFile := fmt.Sprintf("/tmp/miner-%d.tar.gz", time.Now().Unix())
+		fmt.Println("Download to", tempFile)
+		// progressChan receives progress updates from the selected downloader
+		// and is used to display the progress
+		progressChan := make(chan mhq.Progress)
+		progressBar := pb.New64(recommendedMiner.SizeBytes)
+		progressBar.SetUnits(pb.U_BYTES)
+		progressBar.Start()
+
+		// We receive the progress via a channel from the downloader
+		go func() {
+			for progress := range progressChan {
+				progressBar.Set64(progress.BytesCompleted)
+			}
+		}()
+		err = mhqClient.DownloadMiner(tempFile, recommendedMiner, progressChan)
+		if err != nil {
+			fmt.Printf("Download failed: %s\n", err)
+			fmt.Print("Press enter to continue...")
+			_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
+			os.Exit(0)
+		}
+		// Just in case the progress bar hasn't updated yet, set to 100%
+		// since we're done
+		progressBar.Set64(recommendedMiner.SizeBytes)
+		progressBar.Update()
+		progressBar.Finish()
+
+		fmt.Printf("Download saved to %v \n", tempFile)
+
 	}
 
 }
