@@ -24,22 +24,62 @@ import (
 //
 // TODO: Implement as gRPC API client before moving out of beta
 type Client struct {
+	// miningKey is the user's mining key. It is used as an identification
+	// token for API calls and websocket connections
+	miningKey string
 	// endpoint of the MiningHQ API
 	endpoint string
 }
 
 // NewClient creates and returns a new MiningHQ API client
-func NewClient(endpoint string) (*Client, error) {
+func NewClient(miningKey string, endpoint string) (*Client, error) {
+	if miningKey == "" {
+		return nil, errors.New(
+			"You must provide a valid mining key to the MiningHQ API client")
+	}
 	if endpoint == "" {
 		return nil, errors.New(
 			"You must provide a valid endpoint to the MiningHQ API client")
 	}
 
 	client := Client{
-		endpoint: endpoint,
+		miningKey: miningKey,
+		endpoint:  endpoint,
 	}
 
 	return &client, nil
+}
+
+// RegisterRig registers this system/rig for the user with MiningHQ
+func (client *Client) RegisterRig(registerRequest RegisterRigRequest) error {
+
+	jsonBytes, err := json.Marshal(registerRequest)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(
+		"POST",
+		fmt.Sprintf("%s/register-rig", client.endpoint),
+		bytes.NewReader(jsonBytes))
+	if err != nil {
+		return err
+	}
+	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.miningKey))
+
+	apiClient := pester.New()
+	apiClient.MaxRetries = 5
+	response, err := apiClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("Unable to register rig: %s", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("Unable to register rig: %s", response.Status)
+	}
+
+	return nil
 }
 
 // GetRecommendedMiners submits the rig capabilities to MiningHQ and gets
@@ -117,7 +157,8 @@ Loop:
 	}
 
 	// check for errors
-	if err := resp.Err(); err != nil {
+	err = resp.Err()
+	if err != nil {
 		return err
 	}
 

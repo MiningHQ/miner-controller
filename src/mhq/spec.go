@@ -1,5 +1,7 @@
 package mhq
 
+import "github.com/donovansolms/mininghq-miner-controller/src/caps"
+
 // Progress holds information about the current download progress
 type Progress struct {
 	BytesCompleted int64
@@ -22,4 +24,13 @@ type RecommendedMiner struct {
 	DownloadLink   string `json:"DownloadLink"`
 	DownloadSHA512 string `json:"DownloadSHA512"`
 	SizeBytes      int64  `json:"SizeBytes"`
+}
+
+// RegisterRigRequest is the request sent to MiningHQ to register a new rig
+type RegisterRigRequest struct {
+	// Name is a custom name for this rig,
+	// if blank, it will be set to the hostname
+	Name string
+	// Caps is the capabilities of this rig
+	Caps caps.SystemInfo
 }
