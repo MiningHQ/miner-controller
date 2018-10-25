@@ -35,11 +35,11 @@ type Client struct {
 func NewClient(miningKey string, endpoint string) (*Client, error) {
 	if miningKey == "" {
 		return nil, errors.New(
-			"You must provide a valid mining key to the MiningHQ API client")
+			"You must provide a valid mining key to the MiningHQ API client, not blank")
 	}
 	if endpoint == "" {
 		return nil, errors.New(
-			"You must provide a valid endpoint to the MiningHQ API client")
+			"You must provide a valid endpoint to the MiningHQ API client, not blank")
 	}
 
 	client := Client{
@@ -51,11 +51,13 @@ func NewClient(miningKey string, endpoint string) (*Client, error) {
 }
 
 // RegisterRig registers this system/rig for the user with MiningHQ
-func (client *Client) RegisterRig(registerRequest RegisterRigRequest) error {
+// It returns the MiningHQ RigID
+func (client *Client) RegisterRig(
+	registerRequest RegisterRigRequest) (string, error) {
 
 	jsonBytes, err := json.Marshal(registerRequest)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	request, err := http.NewRequest(
@@ -63,7 +65,7 @@ func (client *Client) RegisterRig(registerRequest RegisterRigRequest) error {
 		fmt.Sprintf("%s/register-rig", client.endpoint),
 		bytes.NewReader(jsonBytes))
 	if err != nil {
-		return err
+		return "", err
 	}
 	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.miningKey))
 
@@ -71,15 +73,25 @@ func (client *Client) RegisterRig(registerRequest RegisterRigRequest) error {
 	apiClient.MaxRetries = 5
 	response, err := apiClient.Do(request)
 	if err != nil {
-		return fmt.Errorf("Unable to register rig: %s", err)
+		return "", fmt.Errorf("Unable to register rig: %s", err)
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("Unable to register rig: %s", response.Status)
+		return "", fmt.Errorf("Unable to register rig: %s", response.Status)
 	}
 
-	return nil
+	var registerResponse RegisterRigResponse
+	err = json.NewDecoder(response.Body).Decode(&registerResponse)
+	if err != nil {
+		return "", fmt.Errorf("Unable to read register response: %s", err)
+	}
+
+	if registerResponse.Status == "err" {
+		return "", errors.New(registerResponse.Message)
+	}
+
+	return registerResponse.RigID, nil
 }
 
 // GetRecommendedMiners submits the rig capabilities to MiningHQ and gets

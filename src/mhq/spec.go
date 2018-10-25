@@ -34,3 +34,10 @@ type RegisterRigRequest struct {
 	// Caps is the capabilities of this rig
 	Caps caps.SystemInfo
 }
+
+// RegisterRigResponse is returned after a RegisterRigRequest
+type RegisterRigResponse struct {
+	Status  string `json:"Status"`
+	Message string `json:"Message"`
+	RigID   string `json:"RigID"`
+}
