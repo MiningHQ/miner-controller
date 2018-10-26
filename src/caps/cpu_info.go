@@ -16,7 +16,7 @@ type CPUInfo struct {
 	GHz            float64
 	Cores          uint32
 	Threads        uint32
-	CacheMB        uint32
+	CacheKB        uint32
 	HasHardwareAES bool
 }
 
@@ -24,13 +24,13 @@ type CPUInfo struct {
 func (cpu CPUInfo) String() string {
 	return fmt.Sprintf(
 		"CPU #%d Vendor: %s, Product: %s, Cores: %d, Threads: %d, "+
-			"Cache (L3): %d MB, GHz: %.2f, HardwareAES: %t",
+			"Cache (L3): %d KB, GHz: %.2f, HardwareAES: %t",
 		cpu.ID,
 		cpu.Vendor,
 		cpu.Product,
 		cpu.Cores,
 		cpu.Threads,
-		cpu.CacheMB,
+		cpu.CacheKB,
 		cpu.GHz,
 		cpu.HasHardwareAES,
 	)
@@ -52,7 +52,6 @@ func GetCPUInfo() ([]CPUInfo, error) {
 	var currentCPU CPUInfo
 	currentCPUID := 0
 	for _, processorThread := range cpus {
-
 		cpuID, err := strconv.Atoi(processorThread.PhysicalID)
 		if err != nil {
 			return cpuInfos, fmt.Errorf("Unable to get CPU ID: %s", err)
@@ -68,7 +67,7 @@ func GetCPUInfo() ([]CPUInfo, error) {
 		}
 
 		currentCPU.ID = uint32(cpuID)
-		currentCPU.CacheMB = uint32(processorThread.CacheSize / 1024)
+		currentCPU.CacheKB = uint32(processorThread.CacheSize)
 		currentCPU.Vendor = processorThread.VendorID
 		currentCPU.Product = processorThread.ModelName
 		currentCPU.GHz = processorThread.Mhz / 1000
