@@ -24,51 +24,83 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/donovansolms/mininghq-miner-controller/src/miner"
-	"github.com/donovansolms/mininghq-spec/spec"
+	"github.com/donovansolms/mininghq-miner-controller/src/mhq"
 )
 
 func main() {
 
-	fmt.Println("Test miner setup and run")
+	fmt.Println("Test running the controller")
+	//
+	// controller, err := ctl.New()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	//
+	// err = controller.Run()
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	config := spec.MinerConfig{
-		Algorithm: "cryptonight",
-		PoolConfig: &spec.PoolConfig{
-			Endpoint: "mine.stellite.cash:80",
-			Username: "Se44JmF1FWQ7ZL6fYNqBu2cHhPvExcvecCKad2kwsdeaCJUE8KjThiRPb6dR4XuXUsad8FsD8DypDC8xpCe85Bfi1wRcdNvS9",
-			Password: "test",
-			Variant:  "xtl",
-		},
-		CPUConfig: &spec.CPUConfig{
-			ThreadCount: 2,
-		},
-	}
-
-	xmrig, err := miner.NewXmrig(
-		"/tmp/miners/xmrig",
-		"/tmp/config1.json",
-		config,
-	)
+	wsclient, err := mhq.NewWebSocketClient("ws://localhost:9999", func(data []byte, err error) {
+		fmt.Println("Got a message!", string(data))
+	})
 	if err != nil {
 		panic(err)
 	}
-
+	fmt.Println("Start!")
 	go func() {
-
-		err := xmrig.Start()
+		err = wsclient.Start()
 		if err != nil {
-			//panic(err)
-			fmt.Println("err:", err)
+			panic(err)
 		}
 	}()
 
-	time.Sleep(time.Second * 60)
-
-	err = xmrig.Stop()
+	fmt.Println("SEND!!!")
+	err = wsclient.WriteMessage([]byte("BASTARDS"))
 	if err != nil {
-		fmt.Println("Stop err", err)
+		fmt.Println("Error send", err)
 	}
+
+	time.Sleep(time.Second * 10)
+
+	//
+	// config := spec.MinerConfig{
+	// 	Algorithm: "cryptonight",
+	// 	PoolConfig: &spec.PoolConfig{
+	// 		Endpoint: "mine.stellite.cash:80",
+	// 		Username: "Se44JmF1FWQ7ZL6fYNqBu2cHhPvExcvecCKad2kwsdeaCJUE8KjThiRPb6dR4XuXUsad8FsD8DypDC8xpCe85Bfi1wRcdNvS9",
+	// 		Password: "test",
+	// 		Variant:  "xtl",
+	// 	},
+	// 	CPUConfig: &spec.CPUConfig{
+	// 		ThreadCount: 2,
+	// 	},
+	// }
+	//
+	// xmrig, err := miner.NewXmrig(
+	// 	"/tmp/miners/xmrig",
+	// 	"/tmp/config1.json",
+	// 	config,
+	// )
+	// if err != nil {
+	// 	panic(err)
+	// }
+	//
+	// go func() {
+	//
+	// 	err := xmrig.Start()
+	// 	if err != nil {
+	// 		//panic(err)
+	// 		fmt.Println("err:", err)
+	// 	}
+	// }()
+	//
+	// time.Sleep(time.Second * 60)
+	//
+	// err = xmrig.Stop()
+	// if err != nil {
+	// 	fmt.Println("Stop err", err)
+	// }
 
 	// p := packet.LoginRequest{
 	// 	MiningKey: "test",
