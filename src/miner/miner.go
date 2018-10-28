@@ -22,7 +22,7 @@ package miner
 
 // Miner interface defines the required behaviour for all cryptocurrency miners
 type Miner interface {
-	Configure() error
+	//Configure(spec.MinerConfig) error
 	Start() error
 	Stop() error
 	GetStats() error

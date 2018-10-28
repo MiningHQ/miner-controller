@@ -22,35 +22,97 @@ package main
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/donovansolms/mininghq-miner-controller/src/caps"
-	"github.com/donovansolms/mininghq-miner-controller/src/mhq"
+	"github.com/donovansolms/mininghq-miner-controller/src/miner"
+	"github.com/donovansolms/mininghq-spec/spec"
 )
 
 func main() {
-	fmt.Println("Initial commit")
+
+	fmt.Println("Test miner setup and run")
+
+	config := spec.MinerConfig{
+		Algorithm: "cryptonight",
+		PoolConfig: &spec.PoolConfig{
+			Endpoint: "mine.stellite.cash:80",
+			Username: "Se44JmF1FWQ7ZL6fYNqBu2cHhPvExcvecCKad2kwsdeaCJUE8KjThiRPb6dR4XuXUsad8FsD8DypDC8xpCe85Bfi1wRcdNvS9",
+			Password: "test",
+			Variant:  "xtl",
+		},
+		CPUConfig: &spec.CPUConfig{
+			ThreadCount: 2,
+		},
+	}
+
+	xmrig, err := miner.NewXmrig(
+		"/tmp/miners/xmrig",
+		"/tmp/config1.json",
+		config,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	go func() {
+
+		err := xmrig.Start()
+		if err != nil {
+			//panic(err)
+			fmt.Println("err:", err)
+		}
+	}()
+
+	time.Sleep(time.Second * 60)
+
+	err = xmrig.Stop()
+	if err != nil {
+		fmt.Println("Stop err", err)
+	}
+
+	// p := packet.LoginRequest{
+	// 	MiningKey: "test",
+	// }
+	// p.RigID = "XX"
+	//
+	// t := packet.MinerConfig{
+	// 	PoolConfig: &packet.PoolConfig{
+	// 		Endpoint: "Seomthing",
+	// 		Username: "",
+	// 		Password: "",
+	// 	},
+	// }
+	// t.GetCPUConfig()
+
+	//
+	// err = beeep.Notify("MiningHQ", "Your miner configuration has been updated", "")
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	// TODO: Get this key from somewhere2
-	miningKey := "5bd0e44cAb2H4G14n0gz4FEVRyd3Scl0Wgk_UCz6"
-
-	systemInfo, err := caps.GetSystemInfo()
-	if err != nil {
-		panic(err)
-	}
-
-	mhqClient, err := mhq.NewClient(miningKey, "http://mininghq.local/api/v1")
-	if err != nil {
-		panic(err)
-	}
-
-	registerRequest := mhq.RegisterRigRequest{
-		Name: "testrig",
-		Caps: systemInfo,
-	}
-	err = mhqClient.RegisterRig(registerRequest)
-	if err != nil {
-		panic(err)
-	}
+	//miningKey := "5bd0e44cAb2H4G14n0gz4FEVRyd3Scl0Wgk_UCz6"
+	//
+	// systemInfo, err := caps.GetSystemInfo()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	//
+	// fmt.Println(systemInfo)
+	//
+	// mhqClient, err := mhq.NewClient(miningKey, "http://mininghq.local/api/v1")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	//
+	// registerRequest := mhq.RegisterRigRequest{
+	// 	Name: "testrig",
+	// 	Caps: systemInfo,
+	// }
+	// err = mhqClient.RegisterRig(registerRequest)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	//
 	// recommendedMiners, err := mhqClient.GetRecommendedMiners(systemInfo)
