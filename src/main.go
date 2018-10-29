@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/donovansolms/mininghq-miner-controller/src/mhq"
+	"github.com/donovansolms/mininghq-spec/spec"
+	"github.com/golang/protobuf/proto"
 )
 
 func main() {
@@ -55,11 +57,36 @@ func main() {
 		}
 	}()
 
+	msg := spec.LoginRequest{
+		MiningKey: "MiningKeyYes",
+		RigID:     "MyRigID",
+	}
+	packet := spec.WSPacket{
+		Message: &spec.WSPacket_LoginRequest{
+			LoginRequest: &msg,
+		},
+	}
+
+	packetBytes, err := proto.Marshal(&packet)
+	if err != nil {
+		panic(err)
+	}
+
 	fmt.Println("SEND!!!")
-	err = wsclient.WriteMessage([]byte("BASTARDS"))
+	_ = packetBytes
+	//err = wsclient.WriteMessage(packetBytes)
+	err = wsclient.WriteMessage([]byte("Test"))
 	if err != nil {
 		fmt.Println("Error send", err)
 	}
+
+	//time.Sleep(time.Second * 2)
+	//
+	// fmt.Println("SEND!!!")
+	// err = wsclient.WriteMessage([]byte("BASTARDS2"))
+	// if err != nil {
+	// 	fmt.Println("Error send", err)
+	// }
 
 	time.Sleep(time.Second * 10)
 

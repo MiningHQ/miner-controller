@@ -37,7 +37,6 @@ func NewWebSocketClient(
 	}
 
 	var err error
-	// TODO: Can we user requestHeader to add auth?
 	client.conn, _, err = websocket.DefaultDialer.Dial(client.endpoint, nil)
 	if err != nil {
 		return nil, err
