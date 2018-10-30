@@ -26,7 +26,7 @@ import (
 
 	"github.com/donovansolms/mininghq-miner-controller/src/mhq"
 	"github.com/donovansolms/mininghq-spec/spec"
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 )
 
 func main() {
@@ -58,30 +58,37 @@ func main() {
 	}()
 
 	msg := spec.LoginRequest{
-		MiningKey: "MiningKeyYes",
-		RigID:     "MyRigID",
+		MiningKey: "5bd22d231UqU9_vGQwlSP-KX5YIFKi14Gsq_YHEd",
+		RigID:     "1i1qWdZ2XSdIrnnvl-BHdFh1kSDQHO6PO",
 	}
 	packet := spec.WSPacket{
 		Message: &spec.WSPacket_LoginRequest{
 			LoginRequest: &msg,
 		},
 	}
+	_ = packet
 
 	packetBytes, err := proto.Marshal(&packet)
 	if err != nil {
 		panic(err)
 	}
-
+	_ = packetBytes
+	//
 	fmt.Println("SEND!!!")
 	_ = packetBytes
-	//err = wsclient.WriteMessage(packetBytes)
-	err = wsclient.WriteMessage([]byte("Test"))
+	err = wsclient.WriteMessage(packetBytes)
+	//err = wsclient.WriteMessage([]byte("Test"))
 	if err != nil {
 		fmt.Println("Error send", err)
 	}
 
-	//time.Sleep(time.Second * 2)
-	//
+	time.Sleep(time.Second * 5)
+	fmt.Println("send2")
+	err = wsclient.WriteMessage(packetBytes)
+	//err = wsclient.WriteMessage([]byte("Test"))
+	if err != nil {
+		fmt.Println("Error send", err)
+	}
 	// fmt.Println("SEND!!!")
 	// err = wsclient.WriteMessage([]byte("BASTARDS2"))
 	// if err != nil {
