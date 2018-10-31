@@ -36,6 +36,7 @@ type Xmrig struct {
 	// configPath might differ from the miner's location due to
 	// how MiningHQ's split mining is implemented
 	configPath    string
+	withUpdate    bool
 	updateWrapper *unattended.Unattended
 }
 
@@ -83,12 +84,14 @@ type xmrigCPUConfigSpec struct {
 // It takes the unattended base path, the path to use for the config
 // and the configuration to use
 //
-// We configure the miner before at construction
+// We configure the miner at construction
 func NewXmrig(
+	withUpdate bool,
 	basePath string,
 	configPath string,
 	config spec.MinerConfig) (*Xmrig, error) {
 	xmrig := Xmrig{
+		withUpdate: withUpdate,
 		// TODO: Need to store it? basepath?
 		configPath: configPath,
 	}
@@ -127,10 +130,18 @@ func NewXmrig(
 				configPath,
 			},
 		},
-		time.Second*5, // UpdateCheckInterval
+		time.Hour, // UpdateCheckInterval
 		log,
 	)
+	if err != nil {
+		return nil, err
+	}
 
+	if xmrig.withUpdate {
+		// During construction we check for any updates as well, this has the
+		// side effect that *if* the miner doesn't exist yet, it will be downloaded
+		_, err = xmrig.updateWrapper.ApplyUpdates()
+	}
 	return &xmrig, err
 }
 
@@ -158,8 +169,12 @@ func (miner *Xmrig) configure(config spec.MinerConfig) error {
 
 // Start xmrig
 func (miner *Xmrig) Start() error {
-	// TODO: Run via unattended
-	return miner.updateWrapper.Run()
+	if miner.withUpdate {
+		//Check for and apply updates first
+		miner.updateWrapper.ApplyUpdates()
+		return miner.updateWrapper.Run()
+	}
+	return miner.updateWrapper.RunWithoutUpdate()
 }
 
 // Stop xmrig
@@ -192,6 +207,8 @@ func (miner *Xmrig) writeConfig(config xmrigCPUConfigSpec) error {
 // generateDefaultCPUConfig creates a config with some sane defaults
 func (miner *Xmrig) generateDefaultCPUConfig() xmrigCPUConfigSpec {
 	config := xmrigCPUConfigSpec{}
+	// TODO: API port needs to be different for each miner... duh
+	// maybe freeport can help. It would need to return the port
 	config.API.Port = 5000
 	config.API.Ipv6 = false
 	config.API.Restricted = true
