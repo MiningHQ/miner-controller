@@ -43,10 +43,16 @@ func main() {
 	// 	panic(err)
 	// }
 
-	wsclient, err := mhq.NewWebSocketClient("ws://localhost:9999", func(data []byte, err error) {
-		fmt.Println("Got a message!", string(data))
-	})
+	wsclient, err := mhq.NewWebSocketClient(
+		"ws://localhost:9999",
+		"5bd22d231UqU9_vGQwlSP-KX5YIFKi14Gsq_YHEd",
+		"1i1qWdZ2XSdIrnnvl-BHdFh1kSDQHO6PO",
+		func(data []byte, err error) {
+			fmt.Println("Got a message!", string(data))
+		})
 	if err != nil {
+
+		fmt.Println("WHAATTT")
 		panic(err)
 	}
 	fmt.Println("Start!")

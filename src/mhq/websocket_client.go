@@ -2,6 +2,7 @@ package mhq
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -23,6 +24,8 @@ type WebSocketClient struct {
 // NewWebSocketClient creates a new instance of the websocket client
 func NewWebSocketClient(
 	endpoint string,
+	miningKey string,
+	rigID string,
 	onMessage func([]byte, error)) (*WebSocketClient, error) {
 	if strings.TrimSpace(endpoint) == "" {
 		return nil, fmt.Errorf("The endpoint for WebSocketClient must not be blank")
@@ -36,9 +39,19 @@ func NewWebSocketClient(
 		//stopChan: make(chan struct{}),
 	}
 
+	headers := http.Header{
+		"Authorization": []string{miningKey},
+		"X-Rig-ID":      []string{rigID},
+	}
 	var err error
-	client.conn, _, err = websocket.DefaultDialer.Dial(client.endpoint, nil)
+	var response *http.Response
+	client.conn, response, err = websocket.DefaultDialer.Dial(
+		client.endpoint,
+		headers)
 	if err != nil {
+		fmt.Println("RESP", response)
+		fmt.Println("HTTPSTAT", response.Status, response.StatusCode)
+		fmt.Println("CONNERR")
 		return nil, err
 	}
 
