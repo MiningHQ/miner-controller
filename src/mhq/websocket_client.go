@@ -49,9 +49,12 @@ func NewWebSocketClient(
 		client.endpoint,
 		headers)
 	if err != nil {
-		fmt.Println("RESP", response)
-		fmt.Println("HTTPSTAT", response.Status, response.StatusCode)
-		fmt.Println("CONNERR")
+		fmt.Println(err)
+		if response != nil {
+			if response.StatusCode == http.StatusUnauthorized {
+				return nil, fmt.Errorf("Invalid credentials supplied")
+			}
+		}
 		return nil, err
 	}
 
@@ -66,7 +69,7 @@ func (client *WebSocketClient) Start() error {
 	for {
 		_, data, err := client.conn.ReadMessage()
 		if err != nil {
-			panic(err)
+			return err
 		}
 		client.onMessage(data, err)
 	}
@@ -89,8 +92,7 @@ func (client *WebSocketClient) Stop() error {
 
 	client.Lock()
 	defer client.Unlock()
-	// Cleanly close the connection by sending a close message and then
-	// waiting (with timeout) for the server to close the connection.
+	// Cleanly close the connection by sending a close message
 	err := client.conn.WriteMessage(
 		websocket.CloseMessage,
 		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))

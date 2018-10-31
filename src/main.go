@@ -21,89 +21,154 @@
 package main
 
 import (
-	"fmt"
-	"time"
-
-	"github.com/donovansolms/mininghq-miner-controller/src/mhq"
-	"github.com/donovansolms/mininghq-spec/spec"
-	"github.com/gogo/protobuf/proto"
+	"github.com/donovansolms/mininghq-miner-controller/src/ctl"
 )
 
 func main() {
 
-	fmt.Println("Test running the controller")
-	//
-	// controller, err := ctl.New()
-	// if err != nil {
-	// 	panic(err)
-	// }
-	//
-	// err = controller.Run()
-	// if err != nil {
-	// 	panic(err)
-	// }
+	// TODO: Logger
 
-	wsclient, err := mhq.NewWebSocketClient(
-		"ws://localhost:9999",
-		"5bd22d231UqU9_vGQwlSP-KX5YIFKi14Gsq_YHEd",
-		"1i1qWdZ2XSdIrnnvl-BHdFh1kSDQHO6PO",
-		func(data []byte, err error) {
-			fmt.Println("Got a message!", string(data))
-		})
-	if err != nil {
+	// TODO: Read this from somewhere
+	websocketEndpoint := "ws://localhost:9999"
+	miningKey := "5bd22d231UqU9_vGQwlSP-KX5YIFKi14Gsq_YHEd"
+	rigID := "1i1qWdZ2XSdIrnnvl-BHdFh1kSDQHO6PO"
 
-		fmt.Println("WHAATTT")
-		panic(err)
-	}
-	fmt.Println("Start!")
-	go func() {
-		err = wsclient.Start()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	msg := spec.LoginRequest{
-		MiningKey: "5bd22d231UqU9_vGQwlSP-KX5YIFKi14Gsq_YHEd",
-		RigID:     "1i1qWdZ2XSdIrnnvl-BHdFh1kSDQHO6PO",
-	}
-	packet := spec.WSPacket{
-		Message: &spec.WSPacket_LoginRequest{
-			LoginRequest: &msg,
-		},
-	}
-	_ = packet
-
-	packetBytes, err := proto.Marshal(&packet)
+	controller, err := ctl.New(
+		websocketEndpoint,
+		miningKey,
+		rigID,
+	)
 	if err != nil {
 		panic(err)
 	}
-	_ = packetBytes
-	//
-	fmt.Println("SEND!!!")
-	_ = packetBytes
-	err = wsclient.WriteMessage(packetBytes)
-	//err = wsclient.WriteMessage([]byte("Test"))
+
+	err = controller.Run()
 	if err != nil {
-		fmt.Println("Error send", err)
+		panic(err)
 	}
 
-	time.Sleep(time.Second * 5)
-	fmt.Println("send2")
-	err = wsclient.WriteMessage(packetBytes)
-	//err = wsclient.WriteMessage([]byte("Test"))
-	if err != nil {
-		fmt.Println("Error send", err)
-	}
+	//
+	//
+
+	//
+	//
+	// wsclient, err := mhq.NewWebSocketClient(
+	// 	"ws://localhost:9999",
+	// 	"5bd22d231UqU9_vGQwlSP-KX5YIFKi14Gsq_YHEd",
+	// 	"1i1qWdZ2XSdIrnnvl-BHdFh1kSDQHO6PO",
+	// 	func(data []byte, err error) {
+	// 		fmt.Println("Got a message!", string(data))
+	// 	})
+	// if err != nil {
+	//
+	// 	fmt.Println("WHAATTT")
+	// 	panic(err)
+	// }
+	// fmt.Println("Start!")
+	// go func() {
+	// 	err = wsclient.Start()
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// }()
+	//
+	// msg := spec.LoginRequest{
+	// 	MiningKey: "5bd22d231UqU9_vGQwlSP-KX5YIFKi14Gsq_YHEd",
+	// 	RigID:     "1i1qWdZ2XSdIrnnvl-BHdFh1kSDQHO6PO",
+	// }
+	// packet := spec.WSPacket{
+	// 	Message: &spec.WSPacket_LoginRequest{
+	// 		LoginRequest: &msg,
+	// 	},
+	// }
+	// _ = packet
+
+	// packetBytes, err := proto.Marshal(&packet)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// _ = packetBytes
+	// //
+	// fmt.Println("SEND!!!")
+	// _ = packetBytes
+	// err = wsclient.WriteMessage(packetBytes)
+	// //err = wsclient.WriteMessage([]byte("Test"))
+	// if err != nil {
+	// 	fmt.Println("Error send", err)
+	// }
+	//
+	// time.Sleep(time.Second * 5)
+	// fmt.Println("send2")
+	// err = wsclient.WriteMessage(packetBytes)
+	// //err = wsclient.WriteMessage([]byte("Test"))
+	// if err != nil {
+	// 	fmt.Println("Error send", err)
+	// }
 	// fmt.Println("SEND!!!")
 	// err = wsclient.WriteMessage([]byte("BASTARDS2"))
 	// if err != nil {
 	// 	fmt.Println("Error send", err)
 	// }
 
-	time.Sleep(time.Second * 10)
-
+	// time.Sleep(time.Second * 10)
+	// RUN MULRTIPLE MINERS!!
+	// configMinersRequest := spec.ConfigureMinerRequest{
+	// 	MinerConfigs: []*spec.MinerConfig{
+	// 		{
+	// 			Algorithm: "cryptonight",
+	// 			PoolConfig: &spec.PoolConfig{
+	// 				Endpoint: "mine.stellite.cash:80",
+	// 				Username: "Se44JmF1FWQ7ZL6fYNqBu2cHhPvExcvecCKad2kwsdeaCJUE8KjThiRPb6dR4XuXUsad8FsD8DypDC8xpCe85Bfi1wRcdNvS9",
+	// 				Password: "test",
+	// 				Variant:  "xtl",
+	// 			},
+	// 			CPUConfig: &spec.CPUConfig{
+	// 				ThreadCount: 2,
+	// 			},
+	// 		},
+	// 		{
+	// 			Algorithm: "cryptonight",
+	// 			PoolConfig: &spec.PoolConfig{
+	// 				Endpoint: "mine.stellite.cash:3333",
+	// 				Username: "Se44JmF1FWQ7ZL6fYNqBu2cHhPvExcvecCKad2kwsdeaCJUE8KjThiRPb6dR4XuXUsad8FsD8DypDC8xpCe85Bfi1wRcdNvS9",
+	// 				Password: "test",
+	// 				Variant:  "xtl",
+	// 			},
+	// 			CPUConfig: &spec.CPUConfig{
+	// 				ThreadCount: 1,
+	// 			},
+	// 		},
+	// 	},
+	// }
 	//
+	// for i, config := range configMinersRequest.MinerConfigs {
+	// 	fmt.Println("Configuring miner ", i)
+	// 	withUpdate := false
+	// 	if i == 0 {
+	// 		withUpdate = true
+	// 	}
+	// 	xmrig, err := miner.NewXmrig(
+	// 		withUpdate,
+	// 		"/tmp/miners/xmrig",
+	// 		"/tmp/config"+strconv.Itoa(i)+".json",
+	// 		*config,
+	// 	)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	go func() {
+	// 		_ = xmrig
+	// 		err := xmrig.Start()
+	// 		if err != nil {
+	// 			//panic(err)
+	// 			fmt.Println("err:", err)
+	// 		}
+	// 	}()
+	// 	//time.Sleep(time.Second * 3)
+	// }
+	// time.Sleep(time.Second * 60)
+
+	// SINGLE MINER
 	// config := spec.MinerConfig{
 	// 	Algorithm: "cryptonight",
 	// 	PoolConfig: &spec.PoolConfig{
@@ -118,6 +183,7 @@ func main() {
 	// }
 	//
 	// xmrig, err := miner.NewXmrig(
+	// 	true,
 	// 	"/tmp/miners/xmrig",
 	// 	"/tmp/config1.json",
 	// 	config,
@@ -155,9 +221,8 @@ func main() {
 	// 	},
 	// }
 	// t.GetCPUConfig()
-
 	//
-	// err = beeep.Notify("MiningHQ", "Your miner configuration has been updated", "")
+	// err := beeep.Notify("MiningHQ", "Your miner configuration has been updated", "")
 	// if err != nil {
 	// 	panic(err)
 	// }
