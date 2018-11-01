@@ -92,7 +92,6 @@ func NewXmrig(
 	config spec.MinerConfig) (*Xmrig, error) {
 	xmrig := Xmrig{
 		withUpdate: withUpdate,
-		// TODO: Need to store it? basepath?
 		configPath: configPath,
 	}
 
@@ -101,7 +100,6 @@ func NewXmrig(
 		return nil, err
 	}
 
-	// TODO: Do I need the log?
 	// Setup the logging, by default we log to stdout
 	logrus.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp:   true,
@@ -113,7 +111,7 @@ func NewXmrig(
 
 	logrus.SetOutput(os.Stdout)
 	log := logrus.WithFields(logrus.Fields{
-		"service": "unattended-test",
+		"service": "unattended",
 	})
 	log.Info("Setting up Unattended updates")
 
@@ -177,12 +175,21 @@ func (miner *Xmrig) Start() error {
 	return miner.updateWrapper.RunWithoutUpdate()
 }
 
-// Stop xmrig
+// Stop the miner and remove the config files
 func (miner *Xmrig) Stop() error {
-	return miner.updateWrapper.Stop()
+	err := miner.updateWrapper.Stop()
+	if err != nil {
+		return err
+	}
+	return os.Remove(miner.configPath)
 }
 
-// GetStats from xmrig
+// GetType returns the miner type
+func (miner *Xmrig) GetType() string {
+	return "xmrig"
+}
+
+// GetStats returns the mining stats in a uniform format from xmrig
 func (miner *Xmrig) GetStats() error {
 	return nil
 }

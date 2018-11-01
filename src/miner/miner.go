@@ -22,8 +22,12 @@ package miner
 
 // Miner interface defines the required behaviour for all cryptocurrency miners
 type Miner interface {
-	//Configure(spec.MinerConfig) error
+	// Start the miner
 	Start() error
+	// Stop the miner and remove the config files
 	Stop() error
+	// GetType returns the miner type
+	GetType() string
+	// GetStats returns the mining stats in a uniform format
 	GetStats() error
 }

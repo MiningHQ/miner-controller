@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/cavaliercoder/grab"
-	"github.com/donovansolms/mininghq-miner-controller/src/caps"
+	"github.com/donovansolms/mininghq-spec/spec/caps"
 	"github.com/sethgrid/pester"
 )
 

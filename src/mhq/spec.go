@@ -1,6 +1,6 @@
 package mhq
 
-import "github.com/donovansolms/mininghq-miner-controller/src/caps"
+import "github.com/donovansolms/mininghq-spec/spec/caps"
 
 // Progress holds information about the current download progress
 type Progress struct {

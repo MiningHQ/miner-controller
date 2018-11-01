@@ -15,14 +15,12 @@ build: ## Build the binary
 
 run: build ## Build and run the binary
 	# Add your environment variable here
-	LOG_LEVEL=debug \
-	LOG_FORMAT=text \
+	DEBUG=true \
 	./bin/${APP_NAME}
 
 run_race: ## Run the binary with race condition checking enabled
 	# Add your environment variable here
-	LOG_LEVEL=debug \
-	LOG_FORMAT=text \
+	DEBUG=true \
 	go run -race ./src/*.go
 
 fmt: ## Format the code using `go fmt`

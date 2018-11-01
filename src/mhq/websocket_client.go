@@ -18,7 +18,7 @@ type WebSocketClient struct {
 	conn     *websocket.Conn
 	//stopChan chan struct{}
 
-	onMessage func([]byte, error)
+	onMessage func([]byte, error) error
 }
 
 // NewWebSocketClient creates a new instance of the websocket client
@@ -26,7 +26,7 @@ func NewWebSocketClient(
 	endpoint string,
 	miningKey string,
 	rigID string,
-	onMessage func([]byte, error)) (*WebSocketClient, error) {
+	onMessage func([]byte, error) error) (*WebSocketClient, error) {
 	if strings.TrimSpace(endpoint) == "" {
 		return nil, fmt.Errorf("The endpoint for WebSocketClient must not be blank")
 	}
@@ -49,7 +49,6 @@ func NewWebSocketClient(
 		client.endpoint,
 		headers)
 	if err != nil {
-		fmt.Println(err)
 		if response != nil {
 			if response.StatusCode == http.StatusUnauthorized {
 				return nil, fmt.Errorf("Invalid credentials supplied")
@@ -68,12 +67,17 @@ func (client *WebSocketClient) Start() error {
 	//defer close(client.stopChan)
 	for {
 		_, data, err := client.conn.ReadMessage()
+		err = client.onMessage(data, err)
 		if err != nil {
+			// switch err.(type) {
+			// case *websocket.CloseError:
+			// TODO: Find a way to repeatedly check if the MiningHQ websocket is back
+			// TODO: Check the error, if connection closed, retry connecting?
+			// default:
+			// }
 			return err
 		}
-		client.onMessage(data, err)
 	}
-	return nil
 }
 
 // WriteMessage send a message via the websocket

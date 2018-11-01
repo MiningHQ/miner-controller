@@ -21,12 +21,56 @@
 package main
 
 import (
+	"os"
+
 	"github.com/donovansolms/mininghq-miner-controller/src/ctl"
+	"github.com/kelseyhightower/envconfig"
+	logrus "github.com/sirupsen/logrus"
+	"github.com/snowzach/rotatefilehook"
 )
+
+// Config holds the environment variables for this service
+type Config struct {
+	Debug bool `split_words:"true"`
+}
 
 func main() {
 
-	// TODO: Logger
+	var config Config
+	logLevel := logrus.InfoLevel
+	err := envconfig.Process("", &config)
+	if err != nil {
+		logrus.Fatal("Unable to process config", err)
+	}
+	logrus.SetOutput(os.Stdout)
+
+	logOutputFormat := logrus.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "Jan 02 15:04:05",
+	}
+	logrus.SetFormatter(&logOutputFormat)
+
+	if config.Debug {
+		logLevel = logrus.DebugLevel
+	}
+	logrus.SetLevel(logLevel)
+	logger := logrus.WithFields(logrus.Fields{
+		"service_class": "miner-controller",
+	})
+
+	rotateFileHook, err := rotatefilehook.NewRotateFileHook(rotatefilehook.RotateFileConfig{
+		Filename:   "mininghq.log",
+		MaxSize:    100, // 100MB files will be rolled
+		MaxBackups: 3,   // Keep a maximum of 3 logfiles
+		MaxAge:     3,   // Keep logfiles for a maximum of 3 days
+		// TODO: Add the lumberjack compression
+		Level:     logLevel,
+		Formatter: &logOutputFormat,
+	})
+	if err != nil {
+		logger.Errorf("Unable to setup file hook: %s", err)
+	}
+	logrus.AddHook(rotateFileHook)
 
 	// TODO: Read this from somewhere
 	websocketEndpoint := "ws://localhost:9999"
@@ -37,14 +81,15 @@ func main() {
 		websocketEndpoint,
 		miningKey,
 		rigID,
+		logger,
 	)
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 
 	err = controller.Run()
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 
 	//
