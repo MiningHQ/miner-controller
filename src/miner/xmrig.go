@@ -21,9 +21,13 @@
 package miner
 
 import (
+	"bufio"
+	"container/list"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"sync"
 	"time"
 
 	unattended "github.com/ProjectLimitless/go-unattended"
@@ -38,6 +42,10 @@ type Xmrig struct {
 	configPath    string
 	withUpdate    bool
 	updateWrapper *unattended.Unattended
+
+	logList  *list.List
+	logMax   int
+	logMutex sync.Mutex
 }
 
 type xmrigPool struct {
@@ -93,8 +101,9 @@ func NewXmrig(
 	xmrig := Xmrig{
 		withUpdate: withUpdate,
 		configPath: configPath,
+		logList:    list.New(),
+		logMax:     100,
 	}
-
 	err := xmrig.configure(config)
 	if err != nil {
 		return nil, err
@@ -134,7 +143,6 @@ func NewXmrig(
 	if err != nil {
 		return nil, err
 	}
-
 	if xmrig.withUpdate {
 		// During construction we check for any updates as well, this has the
 		// side effect that *if* the miner doesn't exist yet, it will be downloaded
@@ -167,6 +175,21 @@ func (miner *Xmrig) configure(config spec.MinerConfig) error {
 
 // Start xmrig
 func (miner *Xmrig) Start() error {
+	// Setup the reading of the output
+	outputReader, outputWriter := io.Pipe()
+	miner.updateWrapper.SetOutputWriter(outputWriter)
+	go func() {
+		scanner := bufio.NewScanner(outputReader)
+		for scanner.Scan() {
+			miner.logMutex.Lock()
+			miner.logList.PushBack(scanner.Text())
+			if miner.logList.Len() >= miner.logMax {
+				miner.logList.Remove(miner.logList.Front())
+			}
+			miner.logMutex.Unlock()
+		}
+	}()
+
 	if miner.withUpdate {
 		//Check for and apply updates first
 		miner.updateWrapper.ApplyUpdates()
@@ -192,6 +215,20 @@ func (miner *Xmrig) GetType() string {
 // GetStats returns the mining stats in a uniform format from xmrig
 func (miner *Xmrig) GetStats() error {
 	return nil
+}
+
+// GetLogs returns the last logs from the actual miner
+func (miner *Xmrig) GetLogs() []string {
+	// Get all the logs and return them in the current order
+	miner.logMutex.Lock()
+	defer miner.logMutex.Unlock()
+
+	var logs []string
+	for item := miner.logList.Front(); item != nil; item = item.Next() {
+		log := item.Value.(string)
+		logs = append(logs, log)
+	}
+	return logs
 }
 
 // writeConfig writes the config to the drive

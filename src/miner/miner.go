@@ -30,4 +30,6 @@ type Miner interface {
 	GetType() string
 	// GetStats returns the mining stats in a uniform format
 	GetStats() error
+	// GetLogs returns the last logs from the actual miner
+	GetLogs() []string
 }

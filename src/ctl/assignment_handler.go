@@ -60,6 +60,7 @@ func (ctl *Ctl) handleAssignment(assignment *spec.RigAssignment) error {
 		if err != nil {
 			return fmt.Errorf("Unable to create new miner (xmrig): %s", err)
 		}
+
 		ctl.miners = append(ctl.miners, xmrig)
 
 		// Start mining again
