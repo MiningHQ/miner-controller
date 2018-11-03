@@ -21,11 +21,9 @@
 package miner
 
 import (
-	"bufio"
 	"container/list"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"sync"
 	"time"
@@ -176,19 +174,26 @@ func (miner *Xmrig) configure(config spec.MinerConfig) error {
 // Start xmrig
 func (miner *Xmrig) Start() error {
 	// Setup the reading of the output
-	outputReader, outputWriter := io.Pipe()
-	miner.updateWrapper.SetOutputWriter(outputWriter)
-	go func() {
-		scanner := bufio.NewScanner(outputReader)
-		for scanner.Scan() {
-			miner.logMutex.Lock()
-			miner.logList.PushBack(scanner.Text())
-			if miner.logList.Len() >= miner.logMax {
-				miner.logList.Remove(miner.logList.Front())
-			}
-			miner.logMutex.Unlock()
-		}
-	}()
+	// TODO: Add back log handling
+	//outputReader, outputWriter := io.Pipe()
+	//miner.updateWrapper.SetOutputWriter(outputWriter)
+	miner.updateWrapper.SetOutputWriter(os.Stdout)
+	// go func() {
+	// 	scanner := bufio.NewScanner(outputReader)
+	// 	for scanner.Scan() {
+	// 		miner.logMutex.Lock()
+	// 		miner.logList.PushBack(scanner.Text())
+	// 		if miner.logList.Len() >= miner.logMax {
+	// 			miner.logList.Remove(miner.logList.Front())
+	// 		}
+	// 		miner.logMutex.Unlock()
+	//
+	// 		// TODO: Can this not be done with the API?
+	// 		if strings.Contains(strings.ToLower(scanner.Text()), "error") {
+	// 			fmt.Println("\n\nDETERTTED ERROR: ", scanner.Text())
+	// 		}
+	// 	}
+	// }()
 
 	if miner.withUpdate {
 		//Check for and apply updates first

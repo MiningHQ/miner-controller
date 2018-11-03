@@ -22,6 +22,7 @@ package ctl
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 
 	"github.com/donovansolms/mininghq-miner-controller/src/miner"
@@ -69,6 +70,7 @@ func (ctl *Ctl) handleAssignment(assignment *spec.RigAssignment) error {
 		// TODO: Until we support more miners, we'll hardcode xmrig :)
 
 		// TODO: Change API port for each miner!
+		// TODO: Write miners and configs to the real dirs
 		//
 		// Configure miners with new assignment
 		xmrig, err := miner.NewXmrig(
@@ -87,15 +89,27 @@ func (ctl *Ctl) handleAssignment(assignment *spec.RigAssignment) error {
 		ctl.log.WithField(
 			"id", i,
 		).Debug("Starting miner with new assignment")
-		go func() {
+		go func(id int) {
 			err := xmrig.Start()
 			if err != nil {
-				// TODO We should send a message back to MiningHQ when we
-				// can't start the miner
-				//panic(err)
-				fmt.Println("err:", err)
+				ctl.log.WithField(
+					"id", id,
+				).Error("Unable to start miner: %s", err)
+				packet := spec.WSPacket{
+					Message: &spec.WSPacket_RigAssignmentResponse{
+						RigAssignmentResponse: &spec.RigAssignmentResponse{
+							Status:     "Miner start error",
+							StatusCode: http.StatusInternalServerError,
+							Reason:     fmt.Sprintf("Unable to start rig miner: %s", err),
+						},
+					},
+				}
+				err = ctl.sendMessage(&packet)
+				if err != nil {
+					ctl.log.Errorf("Unable to send RigAssignmentResponse to MiningHQ: %s", err)
+				}
 			}
-		}()
+		}(i)
 	}
 	return nil
 }

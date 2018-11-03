@@ -21,6 +21,8 @@
 package ctl
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -150,6 +152,20 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 		// with error or success
 		if err != nil {
 			ctl.log.Errorf("Unable to update mining assignment: %s", err)
+			// Send response message
+			packet := spec.WSPacket{
+				Message: &spec.WSPacket_RigAssignmentResponse{
+					RigAssignmentResponse: &spec.RigAssignmentResponse{
+						Status:     "RigAssignment error",
+						StatusCode: http.StatusInternalServerError,
+						Reason:     fmt.Sprintf("Unable to update rig assignment: %s", err),
+					},
+				},
+			}
+			err = ctl.sendMessage(&packet)
+			if err != nil {
+				ctl.log.Errorf("Unable to send RigAssignmentResponse to MiningHQ: %s", err)
+			}
 		}
 		ctl.log.Info("Rig has been reconfigured with new mining assignment")
 
@@ -157,8 +173,8 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 		packet := spec.WSPacket{
 			Message: &spec.WSPacket_RigAssignmentResponse{
 				RigAssignmentResponse: &spec.RigAssignmentResponse{
-					Status:  "Ok",
-					Message: "Rig reconfigured",
+					Status:     "Ok",
+					StatusCode: http.StatusOK,
 				},
 			},
 		}
