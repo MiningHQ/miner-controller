@@ -101,8 +101,8 @@ func (client *WebSocketClient) Start() error {
 func (client *WebSocketClient) WriteMessage(data []byte) error {
 	client.Lock()
 	defer client.Unlock()
-	fmt.Println("Write!")
 	if client.conn == nil {
+		// TODO: Handle
 		fmt.Println("NIL CONN!")
 	}
 	return client.conn.WriteMessage(websocket.TextMessage, data)

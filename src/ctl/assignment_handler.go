@@ -94,7 +94,7 @@ func (ctl *Ctl) handleAssignment(assignment *spec.RigAssignment) error {
 			if err != nil {
 				ctl.log.WithField(
 					"id", id,
-				).Error("Unable to start miner: %s", err)
+				).Errorf("Unable to start miner: %s", err)
 				packet := spec.WSPacket{
 					Message: &spec.WSPacket_RigAssignmentResponse{
 						RigAssignmentResponse: &spec.RigAssignmentResponse{

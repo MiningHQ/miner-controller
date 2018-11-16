@@ -137,19 +137,59 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 		ctl.log.Warningf("Unable to process message: %s", err)
 		return err
 	}
+
 	switch message := packet.Message.(type) {
 	case *spec.WSPacket_Error:
 		ctl.log.WithField(
 			"type", "WSPacket_Error",
 		).Debug("New message received")
 		_ = message
+
+	case *spec.WSPacket_StateRequest:
+		ctl.log.WithField(
+			"type", "WSPacket_StateRequest",
+		).Debug("New message received")
+
+		err = ctl.handleControl(message.StateRequest)
+		if err != nil {
+			ctl.log.Errorf("Unable to update state: %s", err)
+			// Send response message
+			packet := spec.WSPacket{
+				Message: &spec.WSPacket_StateResponse{
+					StateResponse: &spec.StateResponse{
+						Status:     "StateResponse error",
+						StatusCode: http.StatusInternalServerError,
+						Reason:     fmt.Sprintf("Unable to update rig state: %s", err),
+					},
+				},
+			}
+			err = ctl.sendMessage(&packet)
+			if err != nil {
+				ctl.log.Errorf("Unable to send StateResponse to MiningHQ: %s", err)
+			}
+		}
+		ctl.log.Info("Rig state has been updated")
+
+		// Send response message
+		packet := spec.WSPacket{
+			Message: &spec.WSPacket_StateResponse{
+				StateResponse: &spec.StateResponse{
+					Status:     "Ok",
+					StatusCode: http.StatusOK,
+				},
+			},
+		}
+		err = ctl.sendMessage(&packet)
+		if err != nil {
+			ctl.log.Errorf("Unable to send StateResponse to MiningHQ: %s", err)
+		}
+
 	case *spec.WSPacket_RigAssignment:
 		ctl.log.WithField(
 			"type", "WSPacket_RigAssignment",
 		).Debug("New message received")
+
 		err = ctl.handleAssignment(message.RigAssignment)
-		// TODO: Send back a RigAssignmentResponse
-		// with error or success
 		if err != nil {
 			ctl.log.Errorf("Unable to update mining assignment: %s", err)
 			// Send response message
