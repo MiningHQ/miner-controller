@@ -20,6 +20,8 @@
 
 package miner
 
+import "github.com/donovansolms/mininghq-spec/spec"
+
 // Miner interface defines the required behaviour for all cryptocurrency miners
 type Miner interface {
 	// Start the miner
@@ -29,7 +31,7 @@ type Miner interface {
 	// GetType returns the miner type
 	GetType() string
 	// GetStats returns the mining stats in a uniform format
-	GetStats() error
+	GetStats() (spec.MinerStats, error)
 	// GetLogs returns the last logs from the actual miner
 	GetLogs() []string
 }

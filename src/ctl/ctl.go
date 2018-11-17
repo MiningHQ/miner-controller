@@ -27,6 +27,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/donovansolms/mininghq-miner-controller/src/mhq"
 	"github.com/donovansolms/mininghq-miner-controller/src/miner"
@@ -41,10 +42,12 @@ import (
 // with MiningHQ and manage the miners on the local rig
 type Ctl struct {
 	mutex sync.Mutex
+	rigID string
 	// miners hold the current active miners
-	miners []miner.Miner
-	client *mhq.WebSocketClient
-	log    *logrus.Entry
+	miners       []miner.Miner
+	currentState spec.State
+	client       *mhq.WebSocketClient
+	log          *logrus.Entry
 }
 
 // New creates a new instance of the core controller
@@ -56,7 +59,8 @@ func New(
 ) (*Ctl, error) {
 
 	ctl := Ctl{
-		log: log,
+		rigID: rigID,
+		log:   log,
 	}
 
 	var err error
@@ -88,6 +92,11 @@ func (ctl *Ctl) Run() error {
 		case syscall.SIGTERM:
 			ctl.Stop()
 		}
+	}()
+
+	// Start loop for checking stats
+	go func() {
+		ctl.trackAndSubmitStats()
 	}()
 
 	// Send current rig specs to MiningHQ
@@ -239,6 +248,60 @@ func (ctl *Ctl) sendMessage(packet *spec.WSPacket) error {
 		return err
 	}
 	return ctl.client.WriteMessage(packetBytes)
+}
+
+// trackAndSubmitStats gets the stats from the miners and submits it
+// periodically to MiningHQ
+func (ctl *Ctl) trackAndSubmitStats() {
+
+	// TODO: Find a way to shut this down
+	for {
+
+		ctl.mutex.Lock()
+		// If we have no miners and not in the mining state, the wait
+		if len(ctl.miners) == 0 || ctl.currentState != spec.State_Mining {
+			ctl.mutex.Unlock()
+			goto sleep
+		}
+
+		for _, miner := range ctl.miners {
+			stats, err := miner.GetStats()
+			if err != nil {
+				ctl.log.WithField(
+					"rig_id", ctl.rigID,
+				).Warning("Unable to read miner (%s) stats: %s", miner.GetType(), err)
+				continue
+			}
+
+			ctl.log.WithFields(logrus.Fields{
+				"rig_id":   ctl.rigID,
+				"hashrate": stats.Hashrate,
+			}).Debug("Sending stats")
+			packet := &spec.WSPacket{
+				Message: &spec.WSPacket_MinerStats{
+					MinerStats: &stats,
+				},
+			}
+			err = ctl.sendMessage(packet)
+			if err != nil {
+				ctl.log.WithField(
+					"rig_id", ctl.rigID,
+				).Warning("Unable to send miner (%s) stats: %s", miner.GetType(), err)
+				continue
+			}
+
+			ctl.log.WithFields(logrus.Fields{
+				"rig_id":   ctl.rigID,
+				"hashrate": stats.Hashrate,
+			}).Debug("Stats sent")
+		}
+		ctl.mutex.Unlock()
+
+	sleep:
+
+		time.Sleep(time.Second * 5)
+
+	}
 }
 
 // Stop the core controller

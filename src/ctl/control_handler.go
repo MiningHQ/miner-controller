@@ -46,6 +46,7 @@ func (ctl *Ctl) handleControl(control *spec.StateRequest) error {
 			}
 		}
 		ctl.miners = nil
+		ctl.currentState = spec.State_StopMining
 	}
 	return nil
 }

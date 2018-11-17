@@ -76,7 +76,7 @@ func (ctl *Ctl) handleAssignment(assignment *spec.RigAssignment) error {
 		xmrig, err := miner.NewXmrig(
 			withUpdate,
 			"/tmp/miners/xmrig",
-			"/tmp/config"+strconv.Itoa(i)+".json",
+			"/tmp/config."+strconv.Itoa(i)+".json",
 			*config,
 		)
 		if err != nil {
@@ -110,6 +110,8 @@ func (ctl *Ctl) handleAssignment(assignment *spec.RigAssignment) error {
 				}
 			}
 		}(i)
+
+		ctl.currentState = spec.State_Mining
 	}
 	return nil
 }

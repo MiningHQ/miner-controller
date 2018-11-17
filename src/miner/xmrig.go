@@ -24,12 +24,14 @@ import (
 	"container/list"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"sync"
 	"time"
 
 	unattended "github.com/ProjectLimitless/go-unattended"
 	"github.com/donovansolms/mininghq-spec/spec"
+	"github.com/phayes/freeport"
 	"github.com/sirupsen/logrus"
 )
 
@@ -41,6 +43,8 @@ type Xmrig struct {
 	withUpdate    bool
 	updateWrapper *unattended.Unattended
 
+	key      string
+	apiPort  int
 	logList  *list.List
 	logMax   int
 	logMutex sync.Mutex
@@ -85,6 +89,45 @@ type xmrigCPUConfigSpec struct {
 	Watch       bool        `json:"watch"`
 }
 
+// xmrigAPIResponse is returned from the normal miner API
+type xmrigAPIResponse struct {
+	ID       string `json:"id"`
+	WorkerID string `json:"worker_id"`
+	Version  string `json:"version"`
+	Kind     string `json:"kind"`
+	Ua       string `json:"ua"`
+	CPU      struct {
+		Brand   string `json:"brand"`
+		Aes     bool   `json:"aes"`
+		X64     bool   `json:"x64"`
+		Sockets int    `json:"sockets"`
+	} `json:"cpu"`
+	Algo        string `json:"algo"`
+	Hugepages   bool   `json:"hugepages"`
+	DonateLevel int    `json:"donate_level"`
+	Hashrate    struct {
+		Total   []float64   `json:"total"`
+		Highest float64     `json:"highest"`
+		Threads [][]float64 `json:"threads"`
+	} `json:"hashrate"`
+	Results struct {
+		DiffCurrent uint64        `json:"diff_current"`
+		SharesGood  uint32        `json:"shares_good"`
+		SharesTotal uint32        `json:"shares_total"`
+		AvgTime     int           `json:"avg_time"`
+		HashesTotal uint64        `json:"hashes_total"`
+		Best        []int         `json:"best"`
+		ErrorLog    []interface{} `json:"error_log"`
+	} `json:"results"`
+	Connection struct {
+		Pool     string        `json:"pool"`
+		Uptime   int           `json:"uptime"`
+		Ping     int           `json:"ping"`
+		Failures int           `json:"failures"`
+		ErrorLog []interface{} `json:"error_log"`
+	} `json:"connection"`
+}
+
 // NewXmrig creates a new instance of the xmrig CPU miner
 //
 // It takes the unattended base path, the path to use for the config
@@ -97,6 +140,7 @@ func NewXmrig(
 	configPath string,
 	config spec.MinerConfig) (*Xmrig, error) {
 	xmrig := Xmrig{
+		key:        config.Key,
 		withUpdate: withUpdate,
 		configPath: configPath,
 		logList:    list.New(),
@@ -157,7 +201,10 @@ func (miner *Xmrig) configure(config spec.MinerConfig) error {
 		return fmt.Errorf("You must provide a CPUConfig for xmrig")
 	}
 
-	cpuConfig := miner.generateDefaultCPUConfig()
+	cpuConfig, err := miner.generateDefaultCPUConfig()
+	if err != nil {
+		return fmt.Errorf("unable to create config: %s", err)
+	}
 	cpuConfig.Threads = int(config.CPUConfig.ThreadCount)
 	cpuConfig.Algo = config.Algorithm
 	cpuConfig.Pools = []xmrigPool{
@@ -194,6 +241,16 @@ func (miner *Xmrig) Start() error {
 	// 		}
 	// 	}
 	// }()
+	//
+
+	// // HACK / TEST
+	// go func() {
+	// 	for {
+	// 		stats, _ := miner.GetStats()
+	// 		fmt.Println(stats)
+	// 		time.Sleep(time.Second * 5)
+	// 	}
+	// }()
 
 	if miner.withUpdate {
 		//Check for and apply updates first
@@ -218,8 +275,31 @@ func (miner *Xmrig) GetType() string {
 }
 
 // GetStats returns the mining stats in a uniform format from xmrig
-func (miner *Xmrig) GetStats() error {
-	return nil
+func (miner *Xmrig) GetStats() (spec.MinerStats, error) {
+
+	var stats spec.MinerStats
+
+	response, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d", miner.apiPort))
+	if err != nil {
+		fmt.Println(err)
+		return stats, err
+	}
+
+	var xmrigStats xmrigAPIResponse
+	err = json.NewDecoder(response.Body).Decode(&xmrigStats)
+	if err != nil {
+		fmt.Println(err)
+		return stats, err
+	}
+	stats.Key = miner.key
+	stats.Hashrate = xmrigStats.Hashrate.Total[0]
+	stats.MaxHashrate = xmrigStats.Hashrate.Highest
+	stats.TotalHashes = xmrigStats.Results.HashesTotal
+	stats.CurrentDifficulty = xmrigStats.Results.DiffCurrent
+	stats.TotalShares = xmrigStats.Results.SharesTotal
+	stats.AcceptedShares = xmrigStats.Results.SharesGood
+	stats.RejectedShares = stats.TotalShares - stats.AcceptedShares
+	return stats, nil
 }
 
 // GetLogs returns the last logs from the actual miner
@@ -254,11 +334,16 @@ func (miner *Xmrig) writeConfig(config xmrigCPUConfigSpec) error {
 }
 
 // generateDefaultCPUConfig creates a config with some sane defaults
-func (miner *Xmrig) generateDefaultCPUConfig() xmrigCPUConfigSpec {
+func (miner *Xmrig) generateDefaultCPUConfig() (xmrigCPUConfigSpec, error) {
 	config := xmrigCPUConfigSpec{}
-	// TODO: API port needs to be different for each miner... duh
-	// maybe freeport can help. It would need to return the port
-	config.API.Port = 5000
+
+	port, err := freeport.GetFreePort()
+	if err != nil {
+		return config, err
+	}
+
+	miner.apiPort = port
+	config.API.Port = port
 	config.API.Ipv6 = false
 	config.API.Restricted = true
 	config.Asm = "auto"
@@ -282,5 +367,5 @@ func (miner *Xmrig) generateDefaultCPUConfig() xmrigCPUConfigSpec {
 	config.Syslog = false
 	// Watch is currently not supported in xmrig, only in xmrig-proxy
 	config.Watch = false
-	return config
+	return config, nil
 }
