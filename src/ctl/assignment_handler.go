@@ -71,12 +71,12 @@ func (ctl *Ctl) handleAssignment(assignment *spec.RigAssignment) error {
 
 		// TODO: Change API port for each miner!
 		// TODO: Write miners and configs to the real dirs
-		//
+
 		// Configure miners with new assignment
 		xmrig, err := miner.NewXmrig(
 			withUpdate,
 			"/tmp/miners/xmrig",
-			"/tmp/config."+strconv.Itoa(i)+".json",
+			"/tmp/miners/config."+strconv.Itoa(i)+".json",
 			*config,
 		)
 		if err != nil {

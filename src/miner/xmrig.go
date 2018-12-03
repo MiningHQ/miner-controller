@@ -281,14 +281,12 @@ func (miner *Xmrig) GetStats() (spec.MinerStats, error) {
 
 	response, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d", miner.apiPort))
 	if err != nil {
-		fmt.Println(err)
 		return stats, err
 	}
 
 	var xmrigStats xmrigAPIResponse
 	err = json.NewDecoder(response.Body).Decode(&xmrigStats)
 	if err != nil {
-		fmt.Println(err)
 		return stats, err
 	}
 	stats.Key = miner.key
@@ -325,6 +323,7 @@ func (miner *Xmrig) writeConfig(config xmrigCPUConfigSpec) error {
 	if err != nil {
 		return err
 	}
+	defer configFile.Close()
 	err = json.NewEncoder(configFile).Encode(config)
 	if err != nil {
 		return err

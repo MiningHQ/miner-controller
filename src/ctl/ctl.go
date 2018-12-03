@@ -269,7 +269,7 @@ func (ctl *Ctl) trackAndSubmitStats() {
 			if err != nil {
 				ctl.log.WithField(
 					"rig_id", ctl.rigID,
-				).Warning("Unable to read miner (%s) stats: %s", miner.GetType(), err)
+				).Warningf("Unable to read miner (%s) stats: %s", miner.GetType(), err)
 				continue
 			}
 
