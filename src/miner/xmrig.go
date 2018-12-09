@@ -279,6 +279,8 @@ func (miner *Xmrig) GetStats() (spec.MinerStats, error) {
 
 	var stats spec.MinerStats
 
+	fmt.Println("PORT:::::::", miner.apiPort)
+
 	response, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d", miner.apiPort))
 	if err != nil {
 		return stats, err
@@ -297,6 +299,14 @@ func (miner *Xmrig) GetStats() (spec.MinerStats, error) {
 	stats.TotalShares = xmrigStats.Results.SharesTotal
 	stats.AcceptedShares = xmrigStats.Results.SharesGood
 	stats.RejectedShares = stats.TotalShares - stats.AcceptedShares
+
+	cpuStats := spec.CPUStats{}
+	for _, thread := range xmrigStats.Hashrate.Threads {
+		if len(thread) > 0 {
+			cpuStats.ThreadsHashrate = append(cpuStats.ThreadsHashrate, thread[0])
+		}
+	}
+	stats.CPUs = append(stats.CPUs, &cpuStats)
 	return stats, nil
 }
 
