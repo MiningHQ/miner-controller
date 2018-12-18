@@ -193,6 +193,36 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 			ctl.log.Errorf("Unable to send StateResponse to MiningHQ: %s", err)
 		}
 
+	case *spec.WSPacket_GetLogsRequest:
+		ctl.log.WithField(
+			"type", "WSPacket_GetLogsRequest",
+		).Debug("New message received")
+
+		ctl.log.Info("Rig logs requested")
+		response := spec.GetLogsResponse{}
+
+		ctl.mutex.Lock()
+		for _, miner := range ctl.miners {
+			minerLogs := spec.MinerLog{
+				Key:  miner.GetKey(),
+				Logs: miner.GetLogs(),
+			}
+			response.MinerLogs = append(response.MinerLogs, &minerLogs)
+		}
+		ctl.mutex.Unlock()
+
+		// Send the logs back
+		packet := spec.WSPacket{
+			Message: &spec.WSPacket_GetLogsResponse{
+				GetLogsResponse: &response,
+			},
+		}
+		err = ctl.sendMessage(&packet)
+		if err != nil {
+			ctl.log.Errorf("Unable to send GetLogsResponse to MiningHQ: %s", err)
+		}
+		ctl.log.Info("Rig logs sent")
+
 	case *spec.WSPacket_RigAssignment:
 		ctl.log.WithField(
 			"type", "WSPacket_RigAssignment",
@@ -286,7 +316,7 @@ func (ctl *Ctl) trackAndSubmitStats() {
 			if err != nil {
 				ctl.log.WithField(
 					"rig_id", ctl.rigID,
-				).Warning("Unable to send miner (%s) stats: %s", miner.GetType(), err)
+				).Warningf("Unable to send miner (%s) stats: %s", miner.GetType(), err)
 				continue
 			}
 
@@ -294,12 +324,16 @@ func (ctl *Ctl) trackAndSubmitStats() {
 				"rig_id":   ctl.rigID,
 				"hashrate": stats.Hashrate,
 			}).Debug("Stats sent")
+
+			// TODO: Print logs as a test
+			logs := miner.GetLogs()
+			fmt.Println(logs)
 		}
 		ctl.mutex.Unlock()
 
 	sleep:
 
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 10)
 
 	}
 }

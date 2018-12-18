@@ -30,6 +30,8 @@ type Miner interface {
 	Stop() error
 	// GetType returns the miner type
 	GetType() string
+	// GetKey returns the miner's config key
+	GetKey() string
 	// GetStats returns the mining stats in a uniform format
 	GetStats() (spec.MinerStats, error)
 	// GetLogs returns the last logs from the actual miner

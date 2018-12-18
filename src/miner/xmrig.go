@@ -21,11 +21,14 @@
 package miner
 
 import (
+	"bufio"
 	"container/list"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -222,35 +225,26 @@ func (miner *Xmrig) configure(config spec.MinerConfig) error {
 func (miner *Xmrig) Start() error {
 	// Setup the reading of the output
 	// TODO: Add back log handling
-	//outputReader, outputWriter := io.Pipe()
-	//miner.updateWrapper.SetOutputWriter(outputWriter)
-	miner.updateWrapper.SetOutputWriter(os.Stdout)
-	// go func() {
-	// 	scanner := bufio.NewScanner(outputReader)
-	// 	for scanner.Scan() {
-	// 		miner.logMutex.Lock()
-	// 		miner.logList.PushBack(scanner.Text())
-	// 		if miner.logList.Len() >= miner.logMax {
-	// 			miner.logList.Remove(miner.logList.Front())
-	// 		}
-	// 		miner.logMutex.Unlock()
-	//
-	// 		// TODO: Can this not be done with the API?
-	// 		if strings.Contains(strings.ToLower(scanner.Text()), "error") {
-	// 			fmt.Println("\n\nDETERTTED ERROR: ", scanner.Text())
-	// 		}
-	// 	}
-	// }()
-	//
+	outputReader, outputWriter := io.Pipe()
+	miner.updateWrapper.SetOutputWriter(outputWriter)
+	//miner.updateWrapper.SetOutputWriter(os.Stdout)
+	go func() {
+		scanner := bufio.NewScanner(outputReader)
+		for scanner.Scan() {
+			miner.logMutex.Lock()
+			miner.logList.PushBack(scanner.Text())
+			if miner.logList.Len() >= miner.logMax {
+				miner.logList.Remove(miner.logList.Front())
+			}
+			miner.logMutex.Unlock()
 
-	// // HACK / TEST
-	// go func() {
-	// 	for {
-	// 		stats, _ := miner.GetStats()
-	// 		fmt.Println(stats)
-	// 		time.Sleep(time.Second * 5)
-	// 	}
-	// }()
+			// TODO: Can this not be done with the API?
+			if strings.Contains(strings.ToLower(scanner.Text()), "error") {
+				// TODO: This must be reported!!
+				fmt.Println("\n\nDETERTTED ERROR: ", scanner.Text())
+			}
+		}
+	}()
 
 	if miner.withUpdate {
 		//Check for and apply updates first
@@ -274,12 +268,15 @@ func (miner *Xmrig) GetType() string {
 	return "xmrig"
 }
 
+// GetKey returns the miner's config key
+func (miner *Xmrig) GetKey() string {
+	return miner.key
+}
+
 // GetStats returns the mining stats in a uniform format from xmrig
 func (miner *Xmrig) GetStats() (spec.MinerStats, error) {
 
 	var stats spec.MinerStats
-
-	fmt.Println("PORT:::::::", miner.apiPort)
 
 	response, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d", miner.apiPort))
 	if err != nil {
