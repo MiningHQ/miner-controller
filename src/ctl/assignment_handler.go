@@ -22,16 +22,15 @@ package ctl
 
 import (
 	"fmt"
-	"net/http"
 	"strconv"
 
 	"github.com/donovansolms/mininghq-miner-controller/src/miner"
-	"github.com/donovansolms/mininghq-spec/spec"
+	"github.com/donovansolms/mininghq-rpcproto/rpcproto"
 	"github.com/sirupsen/logrus"
 )
 
 // handleAssignment handles new mining assignments from MiningHQ
-func (ctl *Ctl) handleAssignment(assignment *spec.RigAssignment) error {
+func (ctl *Ctl) handleAssignment(assignment *rpcproto.RigAssignmentRequest) error {
 	ctl.mutex.Lock()
 	defer ctl.mutex.Unlock()
 
@@ -66,7 +65,8 @@ func (ctl *Ctl) handleAssignment(assignment *spec.RigAssignment) error {
 		if i == 0 {
 			withUpdate = true
 		}
-		// TODO: The assignment should (probably) determine the miner to use
+
+		// TODO: Use the config.Miner specified
 		// TODO: Until we support more miners, we'll hardcode xmrig :)
 
 		// TODO: Change API port for each miner!
@@ -95,23 +95,25 @@ func (ctl *Ctl) handleAssignment(assignment *spec.RigAssignment) error {
 				ctl.log.WithField(
 					"id", id,
 				).Errorf("Unable to start miner: %s", err)
-				packet := spec.WSPacket{
-					Message: &spec.WSPacket_RigAssignmentResponse{
-						RigAssignmentResponse: &spec.RigAssignmentResponse{
-							Status:     "Miner start error",
-							StatusCode: http.StatusInternalServerError,
-							Reason:     fmt.Sprintf("Unable to start rig miner: %s", err),
-						},
-					},
-				}
-				err = ctl.sendMessage(&packet)
-				if err != nil {
-					ctl.log.Errorf("Unable to send RigAssignmentResponse to MiningHQ: %s", err)
-				}
+
+				// TODO: Change to RPC
+				// packet := spec.WSPacket{
+				// 	Message: &spec.WSPacket_RigAssignmentResponse{
+				// 		RigAssignmentResponse: &spec.RigAssignmentResponse{
+				// 			Status:     "Miner start error",
+				// 			StatusCode: http.StatusInternalServerError,
+				// 			Reason:     fmt.Sprintf("Unable to start rig miner: %s", err),
+				// 		},
+				// 	},
+				// }
+				// err = ctl.sendMessage(&packet)
+				// if err != nil {
+				// 	ctl.log.Errorf("Unable to send RigAssignmentResponse to MiningHQ: %s", err)
+				// }
 			}
 		}(i)
 
-		ctl.currentState = spec.State_Mining
+		ctl.currentState = rpcproto.MinerState_Mining
 	}
 	return nil
 }

@@ -23,30 +23,29 @@ package ctl
 import (
 	"fmt"
 
-	"github.com/donovansolms/mininghq-spec/spec"
+	"github.com/donovansolms/mininghq-rpcproto/rpcproto"
 )
 
 // handleControl handles new control messages from MiningHQ
-func (ctl *Ctl) handleControl(control *spec.StateRequest) error {
+func (ctl *Ctl) handleControl(request *rpcproto.StateRequest) error {
 	ctl.mutex.Lock()
 	defer ctl.mutex.Unlock()
 
-	var err error
-	if control.State == spec.State_StopMining {
+	if request.GetState() == rpcproto.MinerState_StopMining {
 		ctl.log.WithField(
-			"state", spec.State_StopMining.String(),
+			"state", rpcproto.MinerState_StopMining.String(),
 		).Info("Received new control state")
 		// If we were mining, we need to stop all the miners and remove their
 		// config files
 		ctl.log.Debug("Stopping all miners...")
 		for _, miner := range ctl.miners {
-			err = miner.Stop()
+			err := miner.Stop()
 			if err != nil {
 				return fmt.Errorf("Unable to stop miner (%s): %s", miner.GetType(), err)
 			}
 		}
 		ctl.miners = nil
-		ctl.currentState = spec.State_StopMining
+		ctl.currentState = rpcproto.MinerState_StopMining
 	}
 	return nil
 }

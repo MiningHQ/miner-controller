@@ -21,6 +21,7 @@
 package ctl
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -31,8 +32,7 @@ import (
 
 	"github.com/donovansolms/mininghq-miner-controller/src/mhq"
 	"github.com/donovansolms/mininghq-miner-controller/src/miner"
-	"github.com/donovansolms/mininghq-spec/spec"
-	"github.com/donovansolms/mininghq-spec/spec/caps"
+	"github.com/donovansolms/mininghq-rpcproto/rpcproto"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -45,7 +45,7 @@ type Ctl struct {
 	rigID string
 	// miners hold the current active miners
 	miners       []miner.Miner
-	currentState spec.State
+	currentState rpcproto.MinerState
 	client       *mhq.WebSocketClient
 	log          *logrus.Entry
 }
@@ -99,20 +99,22 @@ func (ctl *Ctl) Run() error {
 		ctl.trackAndSubmitStats()
 	}()
 
-	// Send current rig specs to MiningHQ
-	systemInfo, err := caps.GetSystemInfo()
-	if err != nil {
-		return err
-	}
-	packet := spec.WSPacket{
-		Message: &spec.WSPacket_SystemInfo{
-			SystemInfo: systemInfo,
-		},
-	}
-	ctl.sendMessage(&packet)
+	// TODO: Send current rig specs to MiningHQ
+	// TODO: Should this even be done?
+	// systemInfo, err := caps.GetSystemInfo()
+	// if err != nil {
+	// 	return err
+	// }
+	// packet := spec.WSPacket{
+	// 	Message: &spec.WSPacket_SystemInfo{
+	// 		SystemInfo: systemInfo,
+	// 	},
+	// }
+	// ctl.sendMessage(&packet)
+
 	// Once the current rig specs have been processed by MiningHQ, we'll
 	// receive the RigAssignment and start mining
-	err = ctl.client.Start()
+	err := ctl.client.Start()
 	if err != nil {
 		switch typedErr := err.(type) {
 		case *websocket.CloseError:
@@ -140,139 +142,185 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 		return err
 	}
 
-	var packet spec.WSPacket
+	var packet rpcproto.Packet
 	err = proto.Unmarshal(data, &packet)
 	if err != nil {
 		ctl.log.Warningf("Unable to process message: %s", err)
 		return err
 	}
 
-	switch message := packet.Message.(type) {
-	case *spec.WSPacket_Error:
-		ctl.log.WithField(
-			"type", "WSPacket_Error",
-		).Debug("New message received")
-		_ = message
+	switch packet.Method {
+	//
+	// Handle incoming errors
+	//
+	case rpcproto.Method_Error:
+		// TODO: Implement errors
 
-	case *spec.WSPacket_StateRequest:
-		ctl.log.WithField(
-			"type", "WSPacket_StateRequest",
-		).Debug("New message received")
+	//
+	// Handle incoming state update requests
+	//
+	case rpcproto.Method_State:
+		request := packet.GetStateRequest()
+		if request == nil {
+			ctl.log.WithFields(logrus.Fields{
+				"method": packet.Method.String(),
+				"params": "StateRequest",
+			}).Error("Params are nil")
+			return errors.New("params are nil")
+		}
 
-		err = ctl.handleControl(message.StateRequest)
+		ctl.log.WithFields(logrus.Fields{
+			"method": packet.Method.String(),
+			"params": "StateRequest",
+		}).Debug("New RPC message processing")
+
+		err = ctl.handleControl(request)
 		if err != nil {
 			ctl.log.Errorf("Unable to update state: %s", err)
 			// Send response message
-			packet := spec.WSPacket{
-				Message: &spec.WSPacket_StateResponse{
-					StateResponse: &spec.StateResponse{
+			response := rpcproto.Packet{
+				Method: rpcproto.Method_State,
+				Params: &rpcproto.Packet_StateResponse{
+					StateResponse: &rpcproto.StateResponse{
 						Status:     "StateResponse error",
 						StatusCode: http.StatusInternalServerError,
 						Reason:     fmt.Sprintf("Unable to update rig state: %s", err),
 					},
 				},
 			}
-			err = ctl.sendMessage(&packet)
+			err = ctl.sendMessage(&response)
 			if err != nil {
 				ctl.log.Errorf("Unable to send StateResponse to MiningHQ: %s", err)
 			}
+			return err
 		}
 		ctl.log.Info("Rig state has been updated")
 
 		// Send response message
-		packet := spec.WSPacket{
-			Message: &spec.WSPacket_StateResponse{
-				StateResponse: &spec.StateResponse{
+		response := rpcproto.Packet{
+			Method: rpcproto.Method_State,
+			Params: &rpcproto.Packet_StateResponse{
+				StateResponse: &rpcproto.StateResponse{
 					Status:     "Ok",
 					StatusCode: http.StatusOK,
 				},
 			},
 		}
-		err = ctl.sendMessage(&packet)
+		err = ctl.sendMessage(&response)
 		if err != nil {
 			ctl.log.Errorf("Unable to send StateResponse to MiningHQ: %s", err)
 		}
 
-	case *spec.WSPacket_GetLogsRequest:
-		ctl.log.WithField(
-			"type", "WSPacket_GetLogsRequest",
-		).Debug("New message received")
+	//
+	// Handle incoming requests for logs
+	//
+	case rpcproto.Method_Logs:
 
-		ctl.log.Info("Rig logs requested")
-		response := spec.GetLogsResponse{}
+		request := packet.GetLogsRequest()
+		if request == nil {
+			ctl.log.WithFields(logrus.Fields{
+				"method": packet.Method.String(),
+				"params": "LogRequest",
+			}).Error("Params are nil")
+			return errors.New("params are nil")
+		}
+
+		ctl.log.WithFields(logrus.Fields{
+			"method": packet.Method.String(),
+			"params": "LogRequest",
+		}).Debug("New RPC message processing")
+
+		logsResponse := rpcproto.LogsResponse{}
 
 		ctl.mutex.Lock()
 		for _, miner := range ctl.miners {
-			minerLogs := spec.MinerLog{
+			minerLogs := rpcproto.MinerLog{
 				Key:  miner.GetKey(),
 				Logs: miner.GetLogs(),
 			}
-			response.MinerLogs = append(response.MinerLogs, &minerLogs)
+			logsResponse.MinerLogs = append(logsResponse.MinerLogs, &minerLogs)
 		}
 		ctl.mutex.Unlock()
 
 		// Send the logs back
-		packet := spec.WSPacket{
-			Message: &spec.WSPacket_GetLogsResponse{
-				GetLogsResponse: &response,
+		response := rpcproto.Packet{
+			Method: rpcproto.Method_Logs,
+			Params: &rpcproto.Packet_LogsResponse{
+				LogsResponse: &logsResponse,
 			},
 		}
-		err = ctl.sendMessage(&packet)
+		err = ctl.sendMessage(&response)
 		if err != nil {
-			ctl.log.Errorf("Unable to send GetLogsResponse to MiningHQ: %s", err)
+			ctl.log.Errorf("Unable to send LogsResponse to MiningHQ: %s", err)
 		}
 		ctl.log.Info("Rig logs sent")
 
-	case *spec.WSPacket_RigAssignment:
-		ctl.log.WithField(
-			"type", "WSPacket_RigAssignment",
-		).Debug("New message received")
+	//
+	// Handle new rig assignment
+	//
+	case rpcproto.Method_RigAssignment:
 
-		err = ctl.handleAssignment(message.RigAssignment)
+		request := packet.GetRigAssignmentRequest()
+		if request == nil {
+			ctl.log.WithFields(logrus.Fields{
+				"method": packet.Method.String(),
+				"params": "RigAssignmentRequest",
+			}).Error("Params are nil")
+			return errors.New("params are nil")
+		}
+
+		ctl.log.WithFields(logrus.Fields{
+			"method": packet.Method.String(),
+			"params": "RigAssignmentRequest",
+		}).Debug("New RPC message processing")
+
+		err = ctl.handleAssignment(request)
 		if err != nil {
 			ctl.log.Errorf("Unable to update mining assignment: %s", err)
 			// Send response message
-			packet := spec.WSPacket{
-				Message: &spec.WSPacket_RigAssignmentResponse{
-					RigAssignmentResponse: &spec.RigAssignmentResponse{
+			response := rpcproto.Packet{
+				Method: rpcproto.Method_RigAssignment,
+				Params: &rpcproto.Packet_RigAssignmentResponse{
+					RigAssignmentResponse: &rpcproto.RigAssignmentResponse{
 						Status:     "RigAssignment error",
 						StatusCode: http.StatusInternalServerError,
 						Reason:     fmt.Sprintf("Unable to update rig assignment: %s", err),
 					},
 				},
 			}
-			err = ctl.sendMessage(&packet)
+			err = ctl.sendMessage(&response)
 			if err != nil {
 				ctl.log.Errorf("Unable to send RigAssignmentResponse to MiningHQ: %s", err)
 			}
+			return err
 		}
 		ctl.log.Info("Rig has been reconfigured with new mining assignment")
 
 		// Send response message
-		packet := spec.WSPacket{
-			Message: &spec.WSPacket_RigAssignmentResponse{
-				RigAssignmentResponse: &spec.RigAssignmentResponse{
+		response := rpcproto.Packet{
+			Method: rpcproto.Method_RigAssignment,
+			Params: &rpcproto.Packet_RigAssignmentResponse{
+				RigAssignmentResponse: &rpcproto.RigAssignmentResponse{
 					Status:     "Ok",
 					StatusCode: http.StatusOK,
 				},
 			},
 		}
-		err = ctl.sendMessage(&packet)
+		err = ctl.sendMessage(&response)
 		if err != nil {
 			ctl.log.Errorf("Unable to send RigAssignmentResponse to MiningHQ: %s", err)
 		}
-
 	default:
 		ctl.log.WithField(
-			"type", "Unknown",
-		).Warning("New message received")
+			"method", packet.Method,
+		).Warning("Unknown method request received")
 	}
 	return nil
 }
 
 // sendMessage takes a WSPacket protocol buffer packet, serializes it
 // and sends it to MiningHQ over websocket
-func (ctl *Ctl) sendMessage(packet *spec.WSPacket) error {
+func (ctl *Ctl) sendMessage(packet *rpcproto.Packet) error {
 	packetBytes, err := proto.Marshal(packet)
 	if err != nil {
 		return err
@@ -287,15 +335,20 @@ func (ctl *Ctl) trackAndSubmitStats() {
 	// TODO: Find a way to shut this down
 	for {
 
+		var err error
+		var packet rpcproto.Packet
+		var statsCollection []*rpcproto.MinerStats
+
 		ctl.mutex.Lock()
 		// If we have no miners and not in the mining state, the wait
-		if len(ctl.miners) == 0 || ctl.currentState != spec.State_Mining {
+		if len(ctl.miners) == 0 || ctl.currentState != rpcproto.MinerState_Mining {
 			ctl.mutex.Unlock()
 			goto sleep
 		}
 
 		for _, miner := range ctl.miners {
-			stats, err := miner.GetStats()
+			var stats rpcproto.MinerStats
+			stats, err = miner.GetStats()
 			if err != nil {
 				ctl.log.WithField(
 					"rig_id", ctl.rigID,
@@ -303,33 +356,44 @@ func (ctl *Ctl) trackAndSubmitStats() {
 				continue
 			}
 
-			ctl.log.WithFields(logrus.Fields{
-				"rig_id":   ctl.rigID,
-				"hashrate": stats.Hashrate,
-			}).Debug("Sending stats")
-			packet := &spec.WSPacket{
-				Message: &spec.WSPacket_MinerStats{
-					MinerStats: &stats,
-				},
-			}
-			err = ctl.sendMessage(packet)
-			if err != nil {
-				ctl.log.WithField(
-					"rig_id", ctl.rigID,
-				).Warningf("Unable to send miner (%s) stats: %s", miner.GetType(), err)
-				continue
-			}
+			minerStats := stats
+			statsCollection = append(statsCollection, &minerStats)
 
 			ctl.log.WithFields(logrus.Fields{
 				"rig_id":   ctl.rigID,
+				"miner":    fmt.Sprintf("%s (%s)", miner.GetType(), miner.GetKey()),
 				"hashrate": stats.Hashrate,
-			}).Debug("Stats sent")
+			}).Debug("Collected stats")
 
-			// TODO: Print logs as a test
+			// HACK TODO: Print logs as a test
 			logs := miner.GetLogs()
 			fmt.Println(logs)
 		}
 		ctl.mutex.Unlock()
+
+		ctl.log.WithFields(logrus.Fields{
+			"rig_id": ctl.rigID,
+		}).Debug("Sending stats")
+
+		packet = rpcproto.Packet{
+			Method: rpcproto.Method_Stats,
+			Params: &rpcproto.Packet_StatsResponse{
+				StatsResponse: &rpcproto.StatsResponse{
+					Stats: statsCollection,
+				},
+			},
+		}
+		err = ctl.sendMessage(&packet)
+		if err != nil {
+			ctl.log.WithField(
+				"rig_id", ctl.rigID,
+			).Warningf("Unable to send rig stats: %s", err)
+			continue
+		}
+
+		ctl.log.WithFields(logrus.Fields{
+			"rig_id": ctl.rigID,
+		}).Debug("Stats sent")
 
 	sleep:
 

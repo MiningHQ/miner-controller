@@ -33,7 +33,7 @@ import (
 	"time"
 
 	unattended "github.com/ProjectLimitless/go-unattended"
-	"github.com/donovansolms/mininghq-spec/spec"
+	"github.com/donovansolms/mininghq-rpcproto/rpcproto"
 	"github.com/phayes/freeport"
 	"github.com/sirupsen/logrus"
 )
@@ -141,7 +141,7 @@ func NewXmrig(
 	withUpdate bool,
 	basePath string,
 	configPath string,
-	config spec.MinerConfig) (*Xmrig, error) {
+	config rpcproto.MinerConfig) (*Xmrig, error) {
 	xmrig := Xmrig{
 		key:        config.Key,
 		withUpdate: withUpdate,
@@ -170,7 +170,7 @@ func NewXmrig(
 	log.Info("Setting up Unattended updates")
 
 	xmrig.updateWrapper, err = unattended.New(
-		"TEST001", // clientID
+		"TEST001", // TODO clientID
 		unattended.Target{ // target
 			VersionsPath:    basePath,
 			AppID:           "xmrig",
@@ -198,7 +198,7 @@ func NewXmrig(
 
 // configure xmrig via the config file. Once reconfigured, the miner
 // would need to be restarted
-func (miner *Xmrig) configure(config spec.MinerConfig) error {
+func (miner *Xmrig) configure(config rpcproto.MinerConfig) error {
 
 	if config.CPUConfig == nil {
 		return fmt.Errorf("You must provide a CPUConfig for xmrig")
@@ -224,7 +224,6 @@ func (miner *Xmrig) configure(config spec.MinerConfig) error {
 // Start xmrig
 func (miner *Xmrig) Start() error {
 	// Setup the reading of the output
-	// TODO: Add back log handling
 	outputReader, outputWriter := io.Pipe()
 	miner.updateWrapper.SetOutputWriter(outputWriter)
 	//miner.updateWrapper.SetOutputWriter(os.Stdout)
@@ -241,7 +240,7 @@ func (miner *Xmrig) Start() error {
 			// TODO: Can this not be done with the API?
 			if strings.Contains(strings.ToLower(scanner.Text()), "error") {
 				// TODO: This must be reported!!
-				fmt.Println("\n\nDETERTTED ERROR: ", scanner.Text())
+				fmt.Println("\n\nDETECTED ERROR: ", scanner.Text())
 			}
 		}
 	}()
@@ -274,9 +273,9 @@ func (miner *Xmrig) GetKey() string {
 }
 
 // GetStats returns the mining stats in a uniform format from xmrig
-func (miner *Xmrig) GetStats() (spec.MinerStats, error) {
+func (miner *Xmrig) GetStats() (rpcproto.MinerStats, error) {
 
-	var stats spec.MinerStats
+	var stats rpcproto.MinerStats
 
 	response, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d", miner.apiPort))
 	if err != nil {
@@ -297,7 +296,7 @@ func (miner *Xmrig) GetStats() (spec.MinerStats, error) {
 	stats.AcceptedShares = xmrigStats.Results.SharesGood
 	stats.RejectedShares = stats.TotalShares - stats.AcceptedShares
 
-	cpuStats := spec.CPUStats{}
+	cpuStats := rpcproto.CPUStats{}
 	for _, thread := range xmrigStats.Hashrate.Threads {
 		if len(thread) > 0 {
 			cpuStats.ThreadsHashrate = append(cpuStats.ThreadsHashrate, thread[0])

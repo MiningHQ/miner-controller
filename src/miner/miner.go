@@ -20,7 +20,7 @@
 
 package miner
 
-import "github.com/donovansolms/mininghq-spec/spec"
+import "github.com/donovansolms/mininghq-rpcproto/rpcproto"
 
 // Miner interface defines the required behaviour for all cryptocurrency miners
 type Miner interface {
@@ -33,7 +33,7 @@ type Miner interface {
 	// GetKey returns the miner's config key
 	GetKey() string
 	// GetStats returns the mining stats in a uniform format
-	GetStats() (spec.MinerStats, error)
+	GetStats() (rpcproto.MinerStats, error)
 	// GetLogs returns the last logs from the actual miner
 	GetLogs() []string
 }

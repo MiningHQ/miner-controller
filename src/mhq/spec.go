@@ -52,7 +52,7 @@ type RegisterRigRequest struct {
 	// if blank, it will be set to the hostname
 	Name string
 	// Caps is the capabilities of this rig
-	Caps caps.SystemInfo
+	Caps *caps.SystemInfo
 }
 
 // RegisterRigResponse is returned after a RegisterRigRequest
