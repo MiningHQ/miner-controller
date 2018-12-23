@@ -24,6 +24,7 @@ import (
 	"bufio"
 	"container/list"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -45,6 +46,7 @@ type Xmrig struct {
 	configPath    string
 	withUpdate    bool
 	updateWrapper *unattended.Unattended
+	errorHandler  func(string, string)
 
 	key      string
 	apiPort  int
@@ -223,6 +225,11 @@ func (miner *Xmrig) configure(config rpcproto.MinerConfig) error {
 
 // Start xmrig
 func (miner *Xmrig) Start() error {
+
+	if miner.errorHandler == nil {
+		return errors.New("error handler is nil, it must be set using SetErrorHandler")
+	}
+
 	// Setup the reading of the output
 	outputReader, outputWriter := io.Pipe()
 	miner.updateWrapper.SetOutputWriter(outputWriter)
@@ -237,10 +244,12 @@ func (miner *Xmrig) Start() error {
 			}
 			miner.logMutex.Unlock()
 
-			// TODO: Can this not be done with the API?
-			if strings.Contains(strings.ToLower(scanner.Text()), "error") {
-				// TODO: This must be reported!!
-				fmt.Println("\n\nDETECTED ERROR: ", scanner.Text())
+			// Check if we got any errors
+			// We do it by reading the logs because errors are not *always*
+			// available via an API
+			if strings.Contains(strings.ToLower(scanner.Text()), "error") ||
+				strings.Contains(strings.ToLower(scanner.Text()), "invalid") {
+				miner.errorHandler(miner.GetKey(), scanner.Text())
 			}
 		}
 	}()
@@ -251,6 +260,12 @@ func (miner *Xmrig) Start() error {
 		return miner.updateWrapper.Run()
 	}
 	return miner.updateWrapper.RunWithoutUpdate()
+}
+
+// SetErrorHandler sets the handler to send any errors to
+// It takes the miner key and the string containing the error
+func (miner *Xmrig) SetErrorHandler(errorHandler func(string, string)) {
+	miner.errorHandler = errorHandler
 }
 
 // Stop the miner and remove the config files

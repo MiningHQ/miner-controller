@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -166,9 +167,9 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 
 	switch packet.Method {
 	//
-	// Handle incoming errors
+	// Handle incoming warnings
 	//
-	case rpcproto.Method_Error:
+	case rpcproto.Method_RigWarning:
 		// TODO: Implement errors
 
 	//
@@ -347,9 +348,7 @@ func (ctl *Ctl) sendMessage(packet *rpcproto.Packet) error {
 // periodically to MiningHQ
 func (ctl *Ctl) trackAndSubmitStats() {
 
-	// TODO: Find a way to shut this down
 	for {
-
 		var err error
 		var packet rpcproto.Packet
 		var statsCollection []*rpcproto.MinerStats
@@ -414,6 +413,44 @@ func (ctl *Ctl) trackAndSubmitStats() {
 		// TODO: Sleep time for stats config
 		time.Sleep(time.Second * 10)
 
+	}
+}
+
+// minerErrorHandler handles errors reported by the miner
+func (ctl *Ctl) minerErrorHandler(minerKey string, errorText string) {
+	ctl.log.WithFields(logrus.Fields{
+		"key": minerKey,
+	}).Errorf("Detected miner error: %s", errorText)
+
+	var packet rpcproto.Packet
+	// If the output contains 'error', generate and error, otherwise a warning
+	if strings.Contains(strings.ToLower(errorText), "error") {
+		packet = rpcproto.Packet{
+			Method: rpcproto.Method_RigError,
+			Params: &rpcproto.Packet_RigError{
+				RigError: &rpcproto.RigErrorDetail{
+					MinerKey: minerKey,
+					Reason:   errorText,
+				},
+			},
+		}
+	} else {
+		packet = rpcproto.Packet{
+			Method: rpcproto.Method_RigWarning,
+			Params: &rpcproto.Packet_RigWarning{
+				RigWarning: &rpcproto.RigWarningDetail{
+					MinerKey: minerKey,
+					Reason:   errorText,
+				},
+			},
+		}
+	}
+
+	err := ctl.sendMessage(&packet)
+	if err != nil {
+		ctl.log.Errorf(
+			"Unable to send RigAssignmentResponse to MiningHQ: %s",
+			err)
 	}
 }
 

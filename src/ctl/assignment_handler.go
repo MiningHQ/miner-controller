@@ -82,6 +82,7 @@ func (ctl *Ctl) handleAssignment(assignment *rpcproto.RigAssignmentRequest) erro
 		if err != nil {
 			return fmt.Errorf("Unable to create new miner (xmrig): %s", err)
 		}
+		xmrig.SetErrorHandler(ctl.minerErrorHandler)
 
 		ctl.miners = append(ctl.miners, xmrig)
 
@@ -96,20 +97,21 @@ func (ctl *Ctl) handleAssignment(assignment *rpcproto.RigAssignmentRequest) erro
 					"id", id,
 				).Errorf("Unable to start miner: %s", err)
 
-				// TODO: Change to RPC
-				// packet := spec.WSPacket{
-				// 	Message: &spec.WSPacket_RigAssignmentResponse{
-				// 		RigAssignmentResponse: &spec.RigAssignmentResponse{
-				// 			Status:     "Miner start error",
-				// 			StatusCode: http.StatusInternalServerError,
-				// 			Reason:     fmt.Sprintf("Unable to start rig miner: %s", err),
-				// 		},
-				// 	},
-				// }
-				// err = ctl.sendMessage(&packet)
-				// if err != nil {
-				// 	ctl.log.Errorf("Unable to send RigAssignmentResponse to MiningHQ: %s", err)
-				// }
+				packet := rpcproto.Packet{
+					Method: rpcproto.Method_RigError,
+					Params: &rpcproto.Packet_RigError{
+						RigError: &rpcproto.RigErrorDetail{
+							MinerKey: config.GetKey(),
+							Reason:   fmt.Sprintf("Unable to start rig miner: %s", err),
+						},
+					},
+				}
+				err = ctl.sendMessage(&packet)
+				if err != nil {
+					ctl.log.Errorf(
+						"Unable to send RigAssignmentResponse to MiningHQ: %s",
+						err)
+				}
 			}
 		}(i)
 
