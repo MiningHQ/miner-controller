@@ -61,6 +61,7 @@ func NewWebSocketClient(
 		"Authorization": []string{miningKey},
 		"X-Rig-ID":      []string{rigID},
 	}
+
 	var err error
 	var response *http.Response
 	client.conn, response, err = websocket.DefaultDialer.Dial(
@@ -74,7 +75,6 @@ func NewWebSocketClient(
 		}
 		return nil, err
 	}
-
 	return &client, nil
 }
 

@@ -41,8 +41,10 @@ import (
 // Ctl implements the core command and control functionality to communicate
 // with MiningHQ and manage the miners on the local rig
 type Ctl struct {
-	mutex sync.Mutex
-	rigID string
+	mutex             sync.Mutex
+	rigID             string
+	websocketEndpoint string
+	miningKey         string
 	// miners hold the current active miners
 	miners       []miner.Miner
 	currentState rpcproto.MinerState
@@ -59,24 +61,38 @@ func New(
 ) (*Ctl, error) {
 
 	ctl := Ctl{
-		rigID: rigID,
-		log:   log,
+		rigID:             rigID,
+		websocketEndpoint: websocketEndpoint,
+		miningKey:         miningKey,
+		log:               log,
 	}
 
-	var err error
-	ctl.log.Debug("Connecting to MiningHQ services")
-	// NewWebSocketClient connects to the given endpoint and authenticates
-	ctl.client, err = mhq.NewWebSocketClient(
-		websocketEndpoint,
-		miningKey,
-		rigID,
-		ctl.onMessage)
-	return &ctl, err
+	return &ctl, nil
 }
 
 // Run the core controller
 func (ctl *Ctl) Run() error {
 	ctl.log.Info("Started")
+
+	var err error
+	// retry forever to connect
+	for {
+		ctl.log.Info("Connecting to MiningHQ services")
+		// NewWebSocketClient connects to the given endpoint and authenticates
+		ctl.client, err = mhq.NewWebSocketClient(
+			ctl.websocketEndpoint,
+			ctl.miningKey,
+			ctl.rigID,
+			ctl.onMessage)
+		if err == nil {
+			ctl.log.Info("Connected to MiningHQ services")
+			break
+		}
+
+		ctl.log.Warningf("Unable to connect to MiningHQ services: %s", err)
+		ctl.log.Warning("Retrying in 10 seconds...")
+		time.Sleep(time.Second * 10)
+	}
 
 	// Setup signal handlers
 	signalChannel := make(chan os.Signal, 2)
@@ -94,11 +110,6 @@ func (ctl *Ctl) Run() error {
 		}
 	}()
 
-	// Start loop for checking stats
-	go func() {
-		ctl.trackAndSubmitStats()
-	}()
-
 	// TODO: Send current rig specs to MiningHQ
 	// TODO: Should this even be done?
 	// systemInfo, err := caps.GetSystemInfo()
@@ -114,12 +125,16 @@ func (ctl *Ctl) Run() error {
 
 	// Once the current rig specs have been processed by MiningHQ, we'll
 	// receive the RigAssignment and start mining
-	err := ctl.client.Start()
+	err = ctl.client.Start()
 	if err != nil {
 		switch typedErr := err.(type) {
 		case *websocket.CloseError:
 			if typedErr.Code != websocket.CloseNormalClosure {
-				return err
+				err = ctl.Stop()
+				if err != nil {
+					ctl.log.Debugf("Error during stopping: %s", err)
+				}
+				return ctl.Run()
 			}
 		default:
 			return err
@@ -138,7 +153,7 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 		default:
 			ctl.log.Errorf("WebSocket read error: %s", err)
 		}
-		ctl.Stop()
+		//ctl.Stop()
 		return err
 	}
 
@@ -343,7 +358,8 @@ func (ctl *Ctl) trackAndSubmitStats() {
 		// If we have no miners and not in the mining state, the wait
 		if len(ctl.miners) == 0 || ctl.currentState != rpcproto.MinerState_Mining {
 			ctl.mutex.Unlock()
-			goto sleep
+			ctl.log.Debug("No miners connected or not mining, stopping stats")
+			return
 		}
 
 		for _, miner := range ctl.miners {
@@ -395,8 +411,7 @@ func (ctl *Ctl) trackAndSubmitStats() {
 			"rig_id": ctl.rigID,
 		}).Debug("Stats sent")
 
-	sleep:
-
+		// TODO: Sleep time for stats config
 		time.Sleep(time.Second * 10)
 
 	}
@@ -412,5 +427,7 @@ func (ctl *Ctl) Stop() error {
 	for _, miner := range ctl.miners {
 		miner.Stop()
 	}
+	ctl.miners = nil
+	ctl.currentState = rpcproto.MinerState_StopMining
 	return ctl.client.Stop()
 }
