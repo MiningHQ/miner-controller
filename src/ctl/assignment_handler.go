@@ -123,5 +123,6 @@ func (ctl *Ctl) handleAssignment(assignment *rpcproto.RigAssignmentRequest) erro
 			ctl.trackAndSubmitStats()
 		}()
 	}
+	ctl.currentAssignment = assignment
 	return nil
 }

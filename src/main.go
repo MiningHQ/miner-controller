@@ -73,12 +73,16 @@ func main() {
 	logrus.AddHook(rotateFileHook)
 
 	// TODO: Read this from somewhere
+	grpcEndpoint := "localhost:64630" // Port = MINE0
 	websocketEndpoint := "ws://localhost:9999"
 	miningKey := "5bd22d231UqU9_vGQwlSP-KX5YIFKi14Gsq_YHEd"
 	rigID := "1i1qWdZ2XSdIrnnvl-BHdFh1kSDQHO6PO"
 
+	// TODO: Start the gRPC service
+
 	controller, err := ctl.New(
 		websocketEndpoint,
+		grpcEndpoint,
 		miningKey,
 		rigID,
 		logger,

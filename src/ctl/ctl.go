@@ -21,8 +21,10 @@
 package ctl
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -37,25 +39,42 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 // Ctl implements the core command and control functionality to communicate
 // with MiningHQ and manage the miners on the local rig
 type Ctl struct {
-	mutex             sync.Mutex
-	rigID             string
+	// mutex for protecting the miner slice
+	mutex sync.Mutex
+	// rigID is this rig's identifier
+	rigID string
+	// websocketEndpoint is the command websocket API endpoint
 	websocketEndpoint string
-	miningKey         string
+	// grpcEndpoint is the endpoint to bind for the
+	// miner manager to use
+	// Must be localhost
+	grpcEndpoint string
+	// grpcServer is the local manager API server
+	grpcServer *grpc.Server
+	// miningKey is the unique key for this user's account
+	miningKey string
 	// miners hold the current active miners
-	miners       []miner.Miner
+	miners []miner.Miner
+	// currentState of this rig
 	currentState rpcproto.MinerState
-	client       *mhq.WebSocketClient
-	log          *logrus.Entry
+	// currentAssignment is the current mining assignment
+	currentAssignment *rpcproto.RigAssignmentRequest
+	// client for communicating with MiningHQ
+	client *mhq.WebSocketClient
+	// log for logs :)
+	log *logrus.Entry
 }
 
 // New creates a new instance of the core controller
 func New(
 	websocketEndpoint string,
+	grpcEndpoint string,
 	miningKey string,
 	rigID string,
 	log *logrus.Entry,
@@ -64,9 +83,15 @@ func New(
 	ctl := Ctl{
 		rigID:             rigID,
 		websocketEndpoint: websocketEndpoint,
+		grpcEndpoint:      grpcEndpoint,
 		miningKey:         miningKey,
 		log:               log,
 	}
+
+	// Create the gRPC manager API
+	serverOptions := []grpc.ServerOption{}
+	ctl.grpcServer = grpc.NewServer(serverOptions...)
+	rpcproto.RegisterManagerServiceServer(ctl.grpcServer, &ctl)
 
 	return &ctl, nil
 }
@@ -76,7 +101,8 @@ func (ctl *Ctl) Run() error {
 	ctl.log.Info("Started")
 
 	var err error
-	// retry forever to connect
+	// This loop retries forever to connect. We'll only ever execute this
+	// more than once if MiningHQ is down
 	for {
 		ctl.log.Info("Connecting to MiningHQ services")
 		// NewWebSocketClient connects to the given endpoint and authenticates
@@ -124,8 +150,32 @@ func (ctl *Ctl) Run() error {
 	// }
 	// ctl.sendMessage(&packet)
 
-	// Once the current rig specs have been processed by MiningHQ, we'll
-	// receive the RigAssignment and start mining
+	// Start the gRPC manager API
+	listener, err := net.Listen("tcp", ctl.grpcEndpoint)
+	if err != nil {
+		ctl.log.WithFields(logrus.Fields{
+			"endpoint": ctl.grpcEndpoint,
+		}).Errorf("Unable to start listener for Manager API server: %s", err)
+
+		return err
+	}
+
+	ctl.log.WithFields(logrus.Fields{
+		"endpoint": ctl.grpcEndpoint,
+	}).Info("gRPC API server starting")
+
+	go func() {
+		err = ctl.grpcServer.Serve(listener)
+		if err != nil {
+			ctl.log.WithFields(logrus.Fields{
+				"endpoint": ctl.grpcEndpoint,
+			}).Errorf("Unable to start gRPC Manager API server: %s", err)
+		}
+	}()
+
+	// Once our connection is processed by MiningHQ, we'll
+	// receive the RigAssignment and start mining - if the user's account
+	// is set up for that
 	err = ctl.client.Start()
 	if err != nil {
 		switch typedErr := err.(type) {
@@ -154,7 +204,7 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 		default:
 			ctl.log.Errorf("WebSocket read error: %s", err)
 		}
-		//ctl.Stop()
+		// TODO: ctl.Stop() ?
 		return err
 	}
 
@@ -170,7 +220,7 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 	// Handle incoming warnings
 	//
 	case rpcproto.Method_RigWarning:
-		// TODO: Implement errors
+		// TODO: Implement warnings from MiningHQ
 
 	//
 	// Handle incoming state update requests
@@ -246,17 +296,9 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 			"params": "LogRequest",
 		}).Debug("New RPC message processing")
 
-		logsResponse := rpcproto.LogsResponse{}
-
-		ctl.mutex.Lock()
-		for _, miner := range ctl.miners {
-			minerLogs := rpcproto.MinerLog{
-				Key:  miner.GetKey(),
-				Logs: miner.GetLogs(),
-			}
-			logsResponse.MinerLogs = append(logsResponse.MinerLogs, &minerLogs)
+		logsResponse := rpcproto.LogsResponse{
+			MinerLogs: ctl.getMinersLogs(),
 		}
-		ctl.mutex.Unlock()
 
 		// Send the logs back
 		response := rpcproto.Packet{
@@ -334,7 +376,7 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 	return nil
 }
 
-// sendMessage takes a WSPacket protocol buffer packet, serializes it
+// sendMessage takes a Packet protocol, serializes it
 // and sends it to MiningHQ over websocket
 func (ctl *Ctl) sendMessage(packet *rpcproto.Packet) error {
 	packetBytes, err := proto.Marshal(packet)
@@ -351,40 +393,17 @@ func (ctl *Ctl) trackAndSubmitStats() {
 	for {
 		var err error
 		var packet rpcproto.Packet
-		var statsCollection []*rpcproto.MinerStats
 
 		ctl.mutex.Lock()
-		// If we have no miners and not in the mining state, the wait
-		if len(ctl.miners) == 0 || ctl.currentState != rpcproto.MinerState_Mining {
-			ctl.mutex.Unlock()
+		minerCount := len(ctl.miners)
+		ctl.mutex.Unlock()
+		// If we have no miners and not in the mining state, then stop sending stats
+		if minerCount == 0 || ctl.currentState != rpcproto.MinerState_Mining {
 			ctl.log.Debug("No miners connected or not mining, stopping stats")
 			return
 		}
 
-		for _, miner := range ctl.miners {
-			var stats rpcproto.MinerStats
-			stats, err = miner.GetStats()
-			if err != nil {
-				ctl.log.WithField(
-					"rig_id", ctl.rigID,
-				).Warningf("Unable to read miner (%s) stats: %s", miner.GetType(), err)
-				continue
-			}
-
-			minerStats := stats
-			statsCollection = append(statsCollection, &minerStats)
-
-			ctl.log.WithFields(logrus.Fields{
-				"rig_id":   ctl.rigID,
-				"miner":    fmt.Sprintf("%s (%s)", miner.GetType(), miner.GetKey()),
-				"hashrate": stats.Hashrate,
-			}).Debug("Collected stats")
-
-			// HACK TODO: Print logs as a test
-			logs := miner.GetLogs()
-			fmt.Println(logs)
-		}
-		ctl.mutex.Unlock()
+		statsCollection := ctl.getMinersStats()
 
 		ctl.log.WithFields(logrus.Fields{
 			"rig_id": ctl.rigID,
@@ -454,9 +473,122 @@ func (ctl *Ctl) minerErrorHandler(minerKey string, errorText string) {
 	}
 }
 
+// GetState requests the current rig state
+func (ctl *Ctl) GetState(
+	ctx context.Context,
+	request *rpcproto.StateRequest) (*rpcproto.StateResponse, error) {
+
+	ctl.log.WithFields(logrus.Fields{
+		"method": "GetState",
+	}).Debug("New gRPC message processing")
+
+	response := rpcproto.StateResponse{
+		State:      ctl.currentState,
+		Status:     "Ok",
+		StatusCode: http.StatusOK,
+	}
+
+	return &response, nil
+}
+
+// SetState requests the rig to enter the specified state
+func (ctl *Ctl) SetState(
+	ctx context.Context,
+	request *rpcproto.StateRequest) (*rpcproto.StateResponse, error) {
+
+	ctl.log.WithFields(logrus.Fields{
+		"method": "SetState",
+	}).Debug("New gRPC message processing")
+
+	err := ctl.handleControl(request)
+	if err != nil {
+		ctl.log.WithField(
+			"method", "SetState",
+		).Errorf("Unable to update state: %s", err)
+
+		response := rpcproto.StateResponse{
+			Status:     "StateResponse error",
+			StatusCode: http.StatusInternalServerError,
+			Reason:     fmt.Sprintf("Unable to update rig state: %s", err),
+		}
+
+		return &response, err
+	}
+	ctl.log.Info("Rig state has been updated")
+
+	// Send response message
+	response := rpcproto.Packet{
+		Method: rpcproto.Method_State,
+		Params: &rpcproto.Packet_StateResponse{
+			StateResponse: &rpcproto.StateResponse{
+				Status:     "Ok",
+				StatusCode: http.StatusOK,
+				State:      ctl.currentState,
+			},
+		},
+	}
+	err = ctl.sendMessage(&response)
+	if err != nil {
+		ctl.log.Errorf("Unable to send StateResponse to MiningHQ: %s", err)
+	}
+
+	return &rpcproto.StateResponse{
+		Status:     "Ok",
+		StatusCode: http.StatusOK,
+		State:      ctl.currentState,
+	}, nil
+}
+
+// GetStats requests the current stats from the rig
+func (ctl *Ctl) GetStats(
+	ctx context.Context,
+	request *rpcproto.StatsRequest) (*rpcproto.StatsResponse, error) {
+
+	ctl.log.WithFields(logrus.Fields{
+		"method": "GetStats",
+	}).Debug("New gRPC message processing")
+
+	statsCollection := ctl.getMinersStats()
+
+	response := rpcproto.StatsResponse{
+		Stats: statsCollection,
+	}
+
+	ctl.log.WithFields(logrus.Fields{
+		"method": "GetStats",
+		"rig_id": ctl.rigID,
+	}).Debug("Stats returned")
+
+	return &response, nil
+}
+
+// GetLogs requests a rig's logs
+func (ctl *Ctl) GetLogs(
+	cts context.Context,
+	request *rpcproto.LogsRequest) (*rpcproto.LogsResponse, error) {
+
+	ctl.log.WithFields(logrus.Fields{
+		"method": "GetLogs",
+	}).Debug("New gRPC message processing")
+
+	response := rpcproto.LogsResponse{
+		MinerLogs: ctl.getMinersLogs(),
+	}
+
+	ctl.log.WithFields(logrus.Fields{
+		"method": "GetLogs",
+		"rig_id": ctl.rigID,
+	}).Debug("Logs returned")
+
+	return &response, nil
+}
+
 // Stop the core controller
 func (ctl *Ctl) Stop() error {
 	defer ctl.log.Info("Shutdown")
+
+	// Stop the gRPC Manager API
+	ctl.grpcServer.Stop()
 
 	// We need to stop all the miners
 	ctl.mutex.Lock()
@@ -467,4 +599,50 @@ func (ctl *Ctl) Stop() error {
 	ctl.miners = nil
 	ctl.currentState = rpcproto.MinerState_StopMining
 	return ctl.client.Stop()
+}
+
+// getMinersStats retrieves the stats from each active miner and returns
+// the slice with all the stats
+func (ctl *Ctl) getMinersStats() []*rpcproto.MinerStats {
+	var statsCollection []*rpcproto.MinerStats
+
+	ctl.mutex.Lock()
+	// Collect stats for all the miners
+	for _, miner := range ctl.miners {
+		var stats rpcproto.MinerStats
+		stats, err := miner.GetStats()
+		if err != nil {
+			ctl.log.WithField(
+				"rig_id", ctl.rigID,
+			).Warningf("Unable to read miner (%s) stats: %s", miner.GetType(), err)
+			continue
+		}
+
+		minerStats := stats
+		statsCollection = append(statsCollection, &minerStats)
+
+		ctl.log.WithFields(logrus.Fields{
+			"rig_id":   ctl.rigID,
+			"miner":    fmt.Sprintf("%s (%s)", miner.GetType(), miner.GetKey()),
+			"hashrate": stats.Hashrate,
+		}).Debug("Collected stats")
+	}
+	ctl.mutex.Unlock()
+	return statsCollection
+}
+
+// getMinersLogs retrieves the logs from each active miner and returns
+// the slice with all the logs
+func (ctl *Ctl) getMinersLogs() []*rpcproto.MinerLog {
+	var logs []*rpcproto.MinerLog
+	ctl.mutex.Lock()
+	for _, miner := range ctl.miners {
+		minerLogs := rpcproto.MinerLog{
+			Key:  miner.GetKey(),
+			Logs: miner.GetLogs(),
+		}
+		logs = append(logs, &minerLogs)
+	}
+	ctl.mutex.Unlock()
+	return logs
 }
