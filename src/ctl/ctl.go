@@ -65,6 +65,8 @@ type Ctl struct {
 	currentState rpcproto.MinerState
 	// currentAssignment is the current mining assignment
 	currentAssignment *rpcproto.RigAssignmentRequest
+	// currentInfo holds the current rig information
+	currentInfo *rpcproto.RigInfoResponse
 	// client for communicating with MiningHQ
 	client *mhq.WebSocketClient
 	// log for logs :)
@@ -149,6 +151,23 @@ func (ctl *Ctl) Run() error {
 	// 	},
 	// }
 	// ctl.sendMessage(&packet)
+
+	// Send initial request for rig information
+	packet := rpcproto.Packet{
+		Method: rpcproto.Method_RigInfo,
+		Params: &rpcproto.Packet_RigInfoRequest{
+			RigInfoRequest: &rpcproto.RigInfoRequest{
+				RigID: ctl.rigID,
+			},
+		},
+	}
+	err = ctl.sendMessage(&packet)
+	if err != nil {
+		ctl.log.WithFields(logrus.Fields{
+			"rig_id": ctl.rigID,
+			"method": packet.Method,
+		}).Errorf("Unable to query rig info: %s", err)
+	}
 
 	// Start the gRPC manager API
 	listener, err := net.Listen("tcp", ctl.grpcEndpoint)
@@ -368,6 +387,33 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 		if err != nil {
 			ctl.log.Errorf("Unable to send RigAssignmentResponse to MiningHQ: %s", err)
 		}
+
+	//
+	// Handle rig information received
+	//
+	case rpcproto.Method_RigInfo:
+		request := packet.GetRigInfoResponse()
+		if request == nil {
+			ctl.log.WithFields(logrus.Fields{
+				"method": packet.Method.String(),
+				"params": "RigInfoResponse",
+			}).Error("Params are nil")
+			return errors.New("params are nil")
+		}
+
+		ctl.log.WithFields(logrus.Fields{
+			"method": packet.Method.String(),
+			"params": "RigInfoResponse",
+		}).Debug("New RPC message processing")
+
+		ctl.currentInfo = request
+		ctl.log.WithFields(logrus.Fields{
+			"method": packet.Method.String(),
+			"params": "RigInfoResponse",
+			"name":   ctl.currentInfo.Name,
+			"link":   ctl.currentInfo.Link,
+		}).Info("Updated local rig information")
+
 	default:
 		ctl.log.WithField(
 			"method", packet.Method,
@@ -471,6 +517,22 @@ func (ctl *Ctl) minerErrorHandler(minerKey string, errorText string) {
 			"Unable to send RigAssignmentResponse to MiningHQ: %s",
 			err)
 	}
+}
+
+// GetInfo returns the information about the rig
+func (ctl *Ctl) GetInfo(
+	ctx context.Context,
+	request *rpcproto.RigInfoRequest) (*rpcproto.RigInfoResponse, error) {
+
+	ctl.log.WithFields(logrus.Fields{
+		"method": "GetInfo",
+	}).Debug("New gRPC message processing")
+
+	if ctl.currentInfo == nil {
+		return nil, errors.New("No info received from MiningHQ yet")
+	}
+
+	return ctl.currentInfo, nil
 }
 
 // GetState requests the current rig state
