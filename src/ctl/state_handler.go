@@ -47,6 +47,8 @@ func (ctl *Ctl) handleControl(request *rpcproto.StateRequest) error {
 		}
 		ctl.miners = nil
 		ctl.currentState = rpcproto.MinerState_StopMining
+		ctl.clearDiscordPresence()
+
 	} else if request.GetState() == rpcproto.MinerState_StartMining {
 		ctl.log.WithField(
 			"state", rpcproto.MinerState_StartMining.String(),

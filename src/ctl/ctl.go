@@ -36,6 +36,7 @@ import (
 	"github.com/donovansolms/mininghq-miner-controller/src/mhq"
 	"github.com/donovansolms/mininghq-miner-controller/src/miner"
 	"github.com/donovansolms/mininghq-rpcproto/rpcproto"
+	"github.com/donovansolms/rich-go/client"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -414,6 +415,47 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 			"link":   ctl.currentInfo.Link,
 		}).Info("Updated local rig information")
 
+		//
+		// Handle incoming account stats
+		//
+	case rpcproto.Method_Stats:
+		// If we receive account stats it means that
+		// the discord integration is enabled and we need to push this
+		// update to Discord
+		response := packet.GetStatsResponse()
+		if response == nil {
+			ctl.log.WithFields(logrus.Fields{
+				"method": packet.Method.String(),
+				"params": "StatsResponse",
+			}).Error("Params are nil")
+			// No stats, clear the presence
+			ctl.clearDiscordPresence()
+			return errors.New("params are nil")
+		}
+
+		ctl.log.WithFields(logrus.Fields{
+			"method": packet.Method.String(),
+			"params": "StatsResponse",
+		}).Debug("New RPC message processing")
+
+		if len(response.Stats) == 0 {
+			ctl.log.WithFields(logrus.Fields{
+				"method": packet.Method.String(),
+				"params": "StatsResponse",
+			}).Error("No stats received from MiningHQ")
+			// No stats, clear the presence
+			ctl.clearDiscordPresence()
+			return errors.New("no stats received")
+		}
+
+		// If the account hashrate is zero, clear the presence
+		if response.Stats[0].Hashrate <= 0.00 {
+			ctl.clearDiscordPresence()
+			return nil
+		}
+		// Set the Discord rich presence
+		ctl.setDiscordHashrate(response.Stats[0].Hashrate)
+
 	default:
 		ctl.log.WithField(
 			"method", packet.Method,
@@ -660,6 +702,7 @@ func (ctl *Ctl) Stop() error {
 	}
 	ctl.miners = nil
 	ctl.currentState = rpcproto.MinerState_StopMining
+	ctl.clearDiscordPresence()
 	return ctl.client.Stop()
 }
 
@@ -707,4 +750,35 @@ func (ctl *Ctl) getMinersLogs() []*rpcproto.MinerLog {
 	}
 	ctl.mutex.Unlock()
 	return logs
+}
+
+// humanizeHashrate takes an integer hashrate and returns the KH or MH equivalent
+func (ctl *Ctl) humanizeHashrate(hashrate float64) string {
+	if hashrate > 1000000 {
+		return fmt.Sprintf("%.2f MH/s", hashrate/1000000)
+	} else if hashrate > 1000 {
+		return fmt.Sprintf("%.2f KH/s", hashrate/1000)
+	}
+	return fmt.Sprintf("%.2f H/s", hashrate)
+}
+
+// setDiscordHashrate sets the hashrate in Discord for the current user
+func (ctl *Ctl) setDiscordHashrate(hashrate float64) {
+	client.Login("530821687864983554")
+	client.SetActivity(client.Activity{
+		State:   fmt.Sprintf("at %s", ctl.humanizeHashrate(hashrate)),
+		Details: "Mining cryptocurrency",
+		Assets: client.Assets{
+			LargeImage: "Unknown",   // TODO: Add image
+			LargeText:  "None",      // TODO: Add image alt
+			SmallImage: "Unkown",    // TODO: Add image
+			SmallText:  "NoneSmall", // TODO: Add image alt
+		},
+	})
+	ctl.log.Debug("Updated Discord presence")
+}
+
+// clearDiscordPresence clears the current set presence in Discord
+func (ctl *Ctl) clearDiscordPresence() {
+	client.Logout()
 }
