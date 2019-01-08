@@ -21,7 +21,10 @@
 package main
 
 import (
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/donovansolms/mininghq-miner-controller/src/ctl"
 	"github.com/kelseyhightower/envconfig"
@@ -58,8 +61,45 @@ func main() {
 		"service_class": "miner-controller",
 	})
 
+	// grpcEndpoint is the gRPC API endpoint used by the Miner Manager to
+	// communicate with the miner controller
+	grpcEndpoint := "localhost:64630" // Port = MINE0
+	// websocketEndpoint is the websocket endpoint connection of MiningHQ
+	// to which we connect for command and control
+	websocketEndpoint := "ws://localhost:9999"
+
+	// The structure of the folders should be
+	// /miner-controller
+	// 	/logs
+	// 		/mininghq.log
+	// 	/{versions}
+	// 		/mininghq-miner-controller
+	// 	/mining_key
+	// 	/rig_id
+
+	// executablePath is the full path to the binary
+	// /miner-controller/{version}/mininghq-miner-controller
+	// /miner-controller/v0.0.0.1/mininghq-miner-controller
+	executablePath, err := os.Executable()
+	if err != nil {
+		logger.Fatalf("Unable to find executing path: %s", err)
+	}
+	// basePath is the dir the executable is in
+	// /miner-controller/v0.0.0.1
+	basePath := filepath.Dir(executablePath)
+	// Go up one more
+	// /miner-controller
+	basePath = filepath.Dir(basePath)
+
+	logsDir := filepath.Join(basePath, "logs")
+	// Make the logs dir
+	err = os.MkdirAll(logsDir, 0755)
+	if err != nil {
+		logger.Fatalf("Unable to create logging directory: %s", err)
+	}
+
 	rotateFileHook, err := rotatefilehook.NewRotateFileHook(rotatefilehook.RotateFileConfig{
-		Filename:   "mininghq.log",
+		Filename:   filepath.Join(logsDir, "mininghq.log"),
 		MaxSize:    100, // 100MB files will be rolled
 		MaxBackups: 3,   // Keep a maximum of 3 logfiles
 		MaxAge:     3,   // Keep logfiles for a maximum of 3 days
@@ -72,278 +112,32 @@ func main() {
 	}
 	logrus.AddHook(rotateFileHook)
 
-	// TODO: Read this from somewhere
-	grpcEndpoint := "localhost:64630" // Port = MINE0
-	websocketEndpoint := "ws://localhost:9999"
-	miningKey := "5bd22d231UqU9_vGQwlSP-KX5YIFKi14Gsq_YHEd"
-	rigID := "1i1qWdZ2XSdIrnnvl-BHdFh1kSDQHO6PO"
+	// Get the user's mining key that was installed
+	miningKey, err := ioutil.ReadFile(filepath.Join(basePath, "mining_key"))
+	if err != nil {
+		logger.Fatalf("Unable to read rig mining key: %s", err)
+	}
 
-	// TODO: Start the gRPC service
+	// Get the rig's ID from registration
+	rigID, err := ioutil.ReadFile(filepath.Join(basePath, "rig_id"))
+	if err != nil {
+		logger.Fatalf("Unable to read rig id: %s", err)
+	}
 
 	controller, err := ctl.New(
 		websocketEndpoint,
 		grpcEndpoint,
-		miningKey,
-		rigID,
+		strings.TrimSpace(string(miningKey)),
+		strings.TrimSpace(string(rigID)),
 		logger,
 	)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
+	// Run the miner controller
 	err = controller.Run()
 	if err != nil {
 		logger.Fatal(err)
 	}
-
-	//
-	//
-
-	//
-	//
-	// wsclient, err := mhq.NewWebSocketClient(
-	// 	"ws://localhost:9999",
-	// 	"5bd22d231UqU9_vGQwlSP-KX5YIFKi14Gsq_YHEd",
-	// 	"1i1qWdZ2XSdIrnnvl-BHdFh1kSDQHO6PO",
-	// 	func(data []byte, err error) {
-	// 		fmt.Println("Got a message!", string(data))
-	// 	})
-	// if err != nil {
-	//
-	// 	fmt.Println("WHAATTT")
-	// 	panic(err)
-	// }
-	// fmt.Println("Start!")
-	// go func() {
-	// 	err = wsclient.Start()
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// }()
-	//
-	// msg := spec.LoginRequest{
-	// 	MiningKey: "5bd22d231UqU9_vGQwlSP-KX5YIFKi14Gsq_YHEd",
-	// 	RigID:     "1i1qWdZ2XSdIrnnvl-BHdFh1kSDQHO6PO",
-	// }
-	// packet := spec.WSPacket{
-	// 	Message: &spec.WSPacket_LoginRequest{
-	// 		LoginRequest: &msg,
-	// 	},
-	// }
-	// _ = packet
-
-	// packetBytes, err := proto.Marshal(&packet)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// _ = packetBytes
-	// //
-	// fmt.Println("SEND!!!")
-	// _ = packetBytes
-	// err = wsclient.WriteMessage(packetBytes)
-	// //err = wsclient.WriteMessage([]byte("Test"))
-	// if err != nil {
-	// 	fmt.Println("Error send", err)
-	// }
-	//
-	// time.Sleep(time.Second * 5)
-	// fmt.Println("send2")
-	// err = wsclient.WriteMessage(packetBytes)
-	// //err = wsclient.WriteMessage([]byte("Test"))
-	// if err != nil {
-	// 	fmt.Println("Error send", err)
-	// }
-	// fmt.Println("SEND!!!")
-	// err = wsclient.WriteMessage([]byte("BASTARDS2"))
-	// if err != nil {
-	// 	fmt.Println("Error send", err)
-	// }
-
-	// time.Sleep(time.Second * 10)
-	// RUN MULRTIPLE MINERS!!
-	// configMinersRequest := spec.ConfigureMinerRequest{
-	// 	MinerConfigs: []*spec.MinerConfig{
-	// 		{
-	// 			Algorithm: "cryptonight",
-	// 			PoolConfig: &spec.PoolConfig{
-	// 				Endpoint: "mine.stellite.cash:80",
-	// 				Username: "Se44JmF1FWQ7ZL6fYNqBu2cHhPvExcvecCKad2kwsdeaCJUE8KjThiRPb6dR4XuXUsad8FsD8DypDC8xpCe85Bfi1wRcdNvS9",
-	// 				Password: "test",
-	// 				Variant:  "xtl",
-	// 			},
-	// 			CPUConfig: &spec.CPUConfig{
-	// 				ThreadCount: 2,
-	// 			},
-	// 		},
-	// 		{
-	// 			Algorithm: "cryptonight",
-	// 			PoolConfig: &spec.PoolConfig{
-	// 				Endpoint: "mine.stellite.cash:3333",
-	// 				Username: "Se44JmF1FWQ7ZL6fYNqBu2cHhPvExcvecCKad2kwsdeaCJUE8KjThiRPb6dR4XuXUsad8FsD8DypDC8xpCe85Bfi1wRcdNvS9",
-	// 				Password: "test",
-	// 				Variant:  "xtl",
-	// 			},
-	// 			CPUConfig: &spec.CPUConfig{
-	// 				ThreadCount: 1,
-	// 			},
-	// 		},
-	// 	},
-	// }
-	//
-	// for i, config := range configMinersRequest.MinerConfigs {
-	// 	fmt.Println("Configuring miner ", i)
-	// 	withUpdate := false
-	// 	if i == 0 {
-	// 		withUpdate = true
-	// 	}
-	// 	xmrig, err := miner.NewXmrig(
-	// 		withUpdate,
-	// 		"/tmp/miners/xmrig",
-	// 		"/tmp/config"+strconv.Itoa(i)+".json",
-	// 		*config,
-	// 	)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// 	go func() {
-	// 		_ = xmrig
-	// 		err := xmrig.Start()
-	// 		if err != nil {
-	// 			//panic(err)
-	// 			fmt.Println("err:", err)
-	// 		}
-	// 	}()
-	// 	//time.Sleep(time.Second * 3)
-	// }
-	// time.Sleep(time.Second * 60)
-
-	// SINGLE MINER
-	// config := spec.MinerConfig{
-	// 	Algorithm: "cryptonight",
-	// 	PoolConfig: &spec.PoolConfig{
-	// 		Endpoint: "mine.stellite.cash:80",
-	// 		Username: "Se44JmF1FWQ7ZL6fYNqBu2cHhPvExcvecCKad2kwsdeaCJUE8KjThiRPb6dR4XuXUsad8FsD8DypDC8xpCe85Bfi1wRcdNvS9",
-	// 		Password: "test",
-	// 		Variant:  "xtl",
-	// 	},
-	// 	CPUConfig: &spec.CPUConfig{
-	// 		ThreadCount: 2,
-	// 	},
-	// }
-	//
-	// xmrig, err := miner.NewXmrig(
-	// 	true,
-	// 	"/tmp/miners/xmrig",
-	// 	"/tmp/config1.json",
-	// 	config,
-	// )
-	// if err != nil {
-	// 	panic(err)
-	// }
-	//
-	// go func() {
-	//
-	// 	err := xmrig.Start()
-	// 	if err != nil {
-	// 		//panic(err)
-	// 		fmt.Println("err:", err)
-	// 	}
-	// }()
-	//
-	// time.Sleep(time.Second * 60)
-	//
-	// err = xmrig.Stop()
-	// if err != nil {
-	// 	fmt.Println("Stop err", err)
-	// }
-
-	// p := packet.LoginRequest{
-	// 	MiningKey: "test",
-	// }
-	// p.RigID = "XX"
-	//
-	// t := packet.MinerConfig{
-	// 	PoolConfig: &packet.PoolConfig{
-	// 		Endpoint: "Seomthing",
-	// 		Username: "",
-	// 		Password: "",
-	// 	},
-	// }
-	// t.GetCPUConfig()
-	//
-	// err := beeep.Notify("MiningHQ", "Your miner configuration has been updated", "")
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// TODO: Get this key from somewhere2
-	//miningKey := "5bd0e44cAb2H4G14n0gz4FEVRyd3Scl0Wgk_UCz6"
-	//
-	// systemInfo, err := caps.GetSystemInfo()
-	// if err != nil {
-	// 	panic(err)
-	// }
-	//
-	// fmt.Println(systemInfo)
-	//
-	// mhqClient, err := mhq.NewClient(miningKey, "http://mininghq.local/api/v1")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	//
-	// registerRequest := mhq.RegisterRigRequest{
-	// 	Name: "testrig",
-	// 	Caps: systemInfo,
-	// }
-	// err = mhqClient.RegisterRig(registerRequest)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	//
-	// recommendedMiners, err := mhqClient.GetRecommendedMiners(systemInfo)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	//
-	// for i, recommendedMiner := range recommendedMiners {
-	// 	fmt.Printf("Downloading miner #%d: %s v%s (%s)\n",
-	// 		i,
-	// 		recommendedMiner.Name,
-	// 		recommendedMiner.Version,
-	// 		recommendedMiner.Type)
-	//
-	// 	// TODO TEMP
-	// 	tempFile := fmt.Sprintf("/tmp/miner-%d.tar.gz", time.Now().Unix())
-	// 	fmt.Println("Download to", tempFile)
-	// 	// progressChan receives progress updates from the selected downloader
-	// 	// and is used to display the progress
-	// 	progressChan := make(chan mhq.Progress)
-	// 	progressBar := pb.New64(recommendedMiner.SizeBytes)
-	// 	progressBar.SetUnits(pb.U_BYTES)
-	// 	progressBar.Start()
-	//
-	// 	// We receive the progress via a channel from the downloader
-	// 	go func() {
-	// 		for progress := range progressChan {
-	// 			progressBar.Set64(progress.BytesCompleted)
-	// 		}
-	// 	}()
-	// 	err = mhqClient.DownloadMiner(tempFile, recommendedMiner, progressChan)
-	// 	if err != nil {
-	// 		fmt.Printf("Download failed: %s\n", err)
-	// 		fmt.Print("Press enter to continue...")
-	// 		_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
-	// 		os.Exit(0)
-	// 	}
-	// 	// Just in case the progress bar hasn't updated yet, set to 100%
-	// 	// since we're done
-	// 	progressBar.Set64(recommendedMiner.SizeBytes)
-	// 	progressBar.Update()
-	// 	progressBar.Finish()
-	//
-	// 	fmt.Printf("Download saved to %v \n", tempFile)
-	//
-	// }
-
 }

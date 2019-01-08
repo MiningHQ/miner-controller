@@ -33,6 +33,7 @@ test_cover: ## Run tests with a coverage report
 	go test ./... -v -cover -covermode=count -coverprofile=./coverage.out
 
 clean: ## Remove compiled binaries from bin/
+	rm -Rf ./bin/logs
 	rm ./bin/*
 
 help: ## Display this help screen

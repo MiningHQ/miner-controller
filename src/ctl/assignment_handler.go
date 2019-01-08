@@ -22,6 +22,8 @@ package ctl
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/donovansolms/mininghq-miner-controller/src/miner"
@@ -72,11 +74,21 @@ func (ctl *Ctl) handleAssignment(assignment *rpcproto.RigAssignmentRequest) erro
 		// TODO: Change API port for each miner!
 		// TODO: Write miners and configs to the real dirs
 
+		executablePath, err := os.Executable()
+		if err != nil {
+			ctl.log.Fatalf("Unable to get current executable path: %s", err)
+		}
+
+		// Walk up the tree to determine the correct path
+		minerDir := filepath.Dir(executablePath)
+		minerDir = filepath.Dir(minerDir)
+		minerDir = filepath.Join(minerDir, "miners")
+
 		// Configure miners with new assignment
 		xmrig, err := miner.NewXmrig(
 			withUpdate,
-			"/tmp/miners/xmrig",
-			"/tmp/miners/config."+strconv.Itoa(i)+".json",
+			filepath.Join(minerDir, "xmrig"),
+			filepath.Join(minerDir, "config."+strconv.Itoa(i)+".json"),
 			*config,
 		)
 		if err != nil {

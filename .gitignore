@@ -16,3 +16,7 @@
 bin/
 logs/
 *.log
+
+# MiningHQ required files
+mining_key
+rig_id
