@@ -107,6 +107,49 @@ func (client *Client) RegisterRig(
 	return registerResponse.RigID, nil
 }
 
+// DeregisterRig removes this system/rig from the user with MiningHQ
+func (client *Client) DeregisterRig(
+	deregisterRequest DeregisterRigRequest) error {
+
+	jsonBytes, err := json.Marshal(deregisterRequest)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(
+		"POST",
+		fmt.Sprintf("%s/deregister-rig", client.endpoint),
+		bytes.NewReader(jsonBytes))
+	if err != nil {
+		return err
+	}
+	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.miningKey))
+
+	apiClient := pester.New()
+	apiClient.MaxRetries = 5
+	response, err := apiClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("Unable to deregister rig: %s", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("Unable to deregister rig: Status %s", response.Status)
+	}
+
+	var deregisterResponse DeregisterRigResponse
+	err = json.NewDecoder(response.Body).Decode(&deregisterResponse)
+	if err != nil {
+		return fmt.Errorf("Unable to read deregister response: %s", err)
+	}
+
+	if deregisterResponse.Status == "err" {
+		return errors.New(deregisterResponse.Message)
+	}
+
+	return nil
+}
+
 // // GetRecommendedMiners submits the rig capabilities to MiningHQ and gets
 // // back a list of compatible miners, if any
 // func (client *Client) GetRecommendedMiners(

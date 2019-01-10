@@ -61,3 +61,15 @@ type RegisterRigResponse struct {
 	Message string `json:"Message"`
 	RigID   string `json:"RigID"`
 }
+
+// DeregisterRigRequest is the request sent to MiningHQ to deregister a rig
+type DeregisterRigRequest struct {
+	// RigID is the identifier for this rig
+	RigID string
+}
+
+// DeregisterRigResponse is returned after a DeregisterRigRequest
+type DeregisterRigResponse struct {
+	Status  string `json:"Status"`
+	Message string `json:"Message"`
+}
