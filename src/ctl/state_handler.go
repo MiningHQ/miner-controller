@@ -57,7 +57,6 @@ func (ctl *Ctl) handleControl(request *rpcproto.StateRequest) error {
 
 		// continue the current assignment if one is set
 		if ctl.currentAssignment != nil {
-			fmt.Println("currentAssignment is set")
 			return ctl.handleAssignment(ctl.currentAssignment)
 		}
 		return errors.New("no assignment set")
