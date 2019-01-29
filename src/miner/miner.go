@@ -37,6 +37,8 @@ type Miner interface {
 	GetStats() (rpcproto.MinerStats, error)
 	// GetLogs returns the last logs from the actual miner
 	GetLogs() []string
+	// GetVersion returns the latest version currently running
+	GetVersion() string
 	// SetErrorHandler sets the handler to send any errors to
 	// It takes the miner key and the string containing the error
 	SetErrorHandler(func(string, string))

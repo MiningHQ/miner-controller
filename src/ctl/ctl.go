@@ -380,13 +380,21 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 		}
 		ctl.log.Info("Rig has been reconfigured with new mining assignment")
 
+		var minerVersions []string
+		ctl.mutex.Lock()
+		for _, miner := range ctl.miners {
+			minerVersions = append(minerVersions, fmt.Sprintf("%s %s", miner.GetType(), miner.GetVersion()))
+		}
+		ctl.mutex.Unlock()
+
 		// Send response message
 		response := rpcproto.Packet{
 			Method: rpcproto.Method_RigAssignment,
 			Params: &rpcproto.Packet_RigAssignmentResponse{
 				RigAssignmentResponse: &rpcproto.RigAssignmentResponse{
-					Status:     "Ok",
-					StatusCode: http.StatusOK,
+					Status:        "Ok",
+					StatusCode:    http.StatusOK,
+					MinerVersions: minerVersions,
 				},
 			},
 		}

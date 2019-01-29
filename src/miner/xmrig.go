@@ -336,6 +336,11 @@ func (miner *Xmrig) GetLogs() []string {
 	return logs
 }
 
+// GetVersion returns the latest version currently running
+func (miner *Xmrig) GetVersion() string {
+	return miner.updateWrapper.GetLatestVersion()
+}
+
 // writeConfig writes the config to the drive
 func (miner *Xmrig) writeConfig(config xmrigCPUConfigSpec) error {
 	configFile, err := os.OpenFile(
