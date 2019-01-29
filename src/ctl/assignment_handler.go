@@ -130,12 +130,13 @@ func (ctl *Ctl) handleAssignment(assignment *rpcproto.RigAssignmentRequest) erro
 
 		ctl.currentState = rpcproto.MinerState_Mining
 	}
-	// Start loop for checking stats
-	if ctl.currentState == rpcproto.MinerState_Mining {
-		go func() {
-			ctl.trackAndSubmitStats()
-		}()
-	}
+	// NOTE: No longer needed, stats are always collected
+	// // Start loop for checking stats
+	// if ctl.currentState == rpcproto.MinerState_Mining {
+	// 	go func() {
+	// 		ctl.trackAndSubmitStats()
+	// 	}()
+	// }
 	ctl.currentAssignment = assignment
 	return nil
 }

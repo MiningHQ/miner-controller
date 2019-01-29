@@ -194,6 +194,11 @@ func (ctl *Ctl) Run() error {
 		}
 	}()
 
+	// Start the stats collection to run always
+	go func() {
+		ctl.trackAndSubmitStats()
+	}()
+
 	// Once our connection is processed by MiningHQ, we'll
 	// receive the RigAssignment and start mining - if the user's account
 	// is set up for that
@@ -487,40 +492,39 @@ func (ctl *Ctl) trackAndSubmitStats() {
 		minerCount := len(ctl.miners)
 		ctl.mutex.Unlock()
 		// If we have no miners and not in the mining state, then stop sending stats
-		if minerCount == 0 || ctl.currentState != rpcproto.MinerState_Mining {
-			ctl.log.Debug("No miners connected or not mining, stopping stats")
-			return
-		}
+		if minerCount > 0 && ctl.currentState == rpcproto.MinerState_Mining {
+			statsCollection := ctl.getMinersStats()
 
-		statsCollection := ctl.getMinersStats()
+			ctl.log.WithFields(logrus.Fields{
+				"rig_id": ctl.rigID,
+			}).Debug("Sending stats")
 
-		ctl.log.WithFields(logrus.Fields{
-			"rig_id": ctl.rigID,
-		}).Debug("Sending stats")
-
-		packet = rpcproto.Packet{
-			Method: rpcproto.Method_Stats,
-			Params: &rpcproto.Packet_StatsResponse{
-				StatsResponse: &rpcproto.StatsResponse{
-					Stats: statsCollection,
+			packet = rpcproto.Packet{
+				Method: rpcproto.Method_Stats,
+				Params: &rpcproto.Packet_StatsResponse{
+					StatsResponse: &rpcproto.StatsResponse{
+						Stats: statsCollection,
+					},
 				},
-			},
-		}
-		err = ctl.sendMessage(&packet)
-		if err != nil {
-			ctl.log.WithField(
-				"rig_id", ctl.rigID,
-			).Warningf("Unable to send rig stats: %s", err)
-			continue
-		}
+			}
+			err = ctl.sendMessage(&packet)
+			if err != nil {
+				ctl.log.WithField(
+					"rig_id", ctl.rigID,
+				).Warningf("Unable to send rig stats: %s", err)
+				continue
+			}
 
-		ctl.log.WithFields(logrus.Fields{
-			"rig_id": ctl.rigID,
-		}).Debug("Stats sent")
+			ctl.log.WithFields(logrus.Fields{
+				"rig_id": ctl.rigID,
+			}).Debug("Stats sent")
+
+		} else {
+			ctl.log.Debug("No miners connected or not mining, not checking stats")
+		}
 
 		// TODO: Sleep time for stats config
 		time.Sleep(time.Second * 10)
-
 	}
 }
 
