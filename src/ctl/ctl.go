@@ -495,9 +495,13 @@ func (ctl *Ctl) trackAndSubmitStats() {
 	for {
 		var err error
 		var packet rpcproto.Packet
+		var minerVersions []string
 
 		ctl.mutex.Lock()
 		minerCount := len(ctl.miners)
+		for _, miner := range ctl.miners {
+			minerVersions = append(minerVersions, fmt.Sprintf("%s %s", miner.GetType(), miner.GetVersion()))
+		}
 		ctl.mutex.Unlock()
 		// If we have no miners and not in the mining state, then stop sending stats
 		if minerCount > 0 && ctl.currentState == rpcproto.MinerState_Mining {
@@ -511,7 +515,8 @@ func (ctl *Ctl) trackAndSubmitStats() {
 				Method: rpcproto.Method_Stats,
 				Params: &rpcproto.Packet_StatsResponse{
 					StatsResponse: &rpcproto.StatsResponse{
-						Stats: statsCollection,
+						Stats:         statsCollection,
+						MinerVersions: minerVersions,
 					},
 				},
 			}
