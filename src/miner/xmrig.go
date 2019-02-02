@@ -30,11 +30,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	unattended "github.com/ProjectLimitless/go-unattended"
+	"github.com/donovansolms/mininghq-miner-controller/src/conf"
 	"github.com/donovansolms/mininghq-rpcproto/rpcproto"
 	"github.com/phayes/freeport"
 	"github.com/sirupsen/logrus"
@@ -173,19 +175,20 @@ func NewXmrig(
 	log.Info("Setting up Unattended updates")
 
 	xmrig.updateWrapper, err = unattended.New(
-		"TEST001", // TODO clientID
+		"TEST001", // TODO clientID - miner key?
 		unattended.Target{ // target
 			VersionsPath:    basePath,
-			AppID:           "xmrig",
-			UpdateEndpoint:  "http://unattended-old.local",
+			AppID:           fmt.Sprintf("xmrig-%s", strings.ToLower(runtime.GOOS)),
+			UpdateEndpoint:  conf.UnattendedBaseURL,
 			UpdateChannel:   "stable",
-			ApplicationName: "xmrig",
+			ApplicationName: "xmrig", // TODO: Does this need to be xmrig.exe on windows?
 			ApplicationParameters: []string{
 				"--config",
 				configPath,
 			},
 		},
-		time.Hour, // UpdateCheckInterval
+		//time.Hour, // UpdateCheckInterval
+		time.Second*20,
 		log,
 	)
 	if err != nil {
