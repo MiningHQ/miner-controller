@@ -13,6 +13,9 @@ default: build ## Build the binary
 build: ## Build the binary
 	go build -o ./bin/${APP_NAME} ./src/*.go
 
+build_windows: ## Build the binary for Windows
+	GOOS=windows GOARCH=amd64 go build -o ./bin/${APP_NAME}.exe ./src/*.go
+
 run: build ## Build and run the binary
 	# Add your environment variable here
 	DEBUG=true \
