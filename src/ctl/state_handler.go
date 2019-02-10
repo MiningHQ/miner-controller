@@ -25,7 +25,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/donovansolms/mininghq-rpcproto/rpcproto"
+	"github.com/mininghq/rpcproto/rpcproto"
 )
 
 // handleControl handles new control messages from MiningHQ

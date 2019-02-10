@@ -27,8 +27,8 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/donovansolms/mininghq-miner-controller/src/miner"
-	"github.com/donovansolms/mininghq-rpcproto/rpcproto"
+	"github.com/mininghq/miner-controller/src/miner"
+	"github.com/mininghq/rpcproto/rpcproto"
 	"github.com/sirupsen/logrus"
 )
 

@@ -34,13 +34,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/donovansolms/mininghq-miner-controller/src/conf"
-	"github.com/donovansolms/mininghq-miner-controller/src/mhq"
-	"github.com/donovansolms/mininghq-miner-controller/src/miner"
-	"github.com/donovansolms/mininghq-rpcproto/rpcproto"
 	"github.com/donovansolms/rich-go/client"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/websocket"
+	"github.com/mininghq/miner-controller/src/conf"
+	"github.com/mininghq/miner-controller/src/mhq"
+	"github.com/mininghq/miner-controller/src/miner"
+	"github.com/mininghq/rpcproto/rpcproto"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )

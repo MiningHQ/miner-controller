@@ -36,8 +36,8 @@ import (
 	"time"
 
 	unattended "github.com/ProjectLimitless/go-unattended"
-	"github.com/donovansolms/mininghq-miner-controller/src/conf"
-	"github.com/donovansolms/mininghq-rpcproto/rpcproto"
+	"github.com/mininghq/miner-controller/src/conf"
+	"github.com/mininghq/rpcproto/rpcproto"
 	"github.com/phayes/freeport"
 	"github.com/sirupsen/logrus"
 )

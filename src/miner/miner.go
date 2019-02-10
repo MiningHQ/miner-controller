@@ -21,7 +21,7 @@
 
 package miner
 
-import "github.com/donovansolms/mininghq-rpcproto/rpcproto"
+import "github.com/mininghq/rpcproto/rpcproto"
 
 // Miner interface defines the required behaviour for all cryptocurrency miners
 type Miner interface {
