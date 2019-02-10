@@ -380,10 +380,8 @@ func (miner *Xmrig) generateDefaultCPUConfig() (xmrigCPUConfigSpec, error) {
 	config.Av = 0
 	// TODO: update this to hide the miner
 	config.Background = false
-	// TODO: Color for now
 	config.Colors = true
-	// TODO: determined by account
-	config.DonateLevel = 5
+	config.DonateLevel = 4
 	config.HugePages = true
 	// TODO: Check if we pass this in the CPU config
 	config.HwAes = true

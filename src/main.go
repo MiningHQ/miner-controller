@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/donovansolms/mininghq-miner-controller/src/conf"
 	"github.com/donovansolms/mininghq-miner-controller/src/ctl"
 	"github.com/kelseyhightower/envconfig"
 	logrus "github.com/sirupsen/logrus"
@@ -67,7 +68,7 @@ func main() {
 	grpcEndpoint := "localhost:64630" // Port = MINE0
 	// websocketEndpoint is the websocket endpoint connection of MiningHQ
 	// to which we connect for command and control
-	websocketEndpoint := "ws://localhost:9999"
+	websocketEndpoint := conf.WebsocketEndpoint
 
 	// The structure of the folders should be
 	// /miner-controller

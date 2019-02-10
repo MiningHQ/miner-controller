@@ -38,3 +38,13 @@ License: MIT
 
 Package: google.golang.org/grpc (github.com/grpc/grpc-go)
 License: Apache-2.0
+
+## Additional software used
+
+XMRig miner
+https://github.com/xmrig/xmrig
+License: GPL-3.0
+
+xmr-stak miner
+https://github.com/fireice-uk/xmr-stak
+License: GPL-3.0

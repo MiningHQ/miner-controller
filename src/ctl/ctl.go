@@ -34,6 +34,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/donovansolms/mininghq-miner-controller/src/conf"
 	"github.com/donovansolms/mininghq-miner-controller/src/mhq"
 	"github.com/donovansolms/mininghq-miner-controller/src/miner"
 	"github.com/donovansolms/mininghq-rpcproto/rpcproto"
@@ -536,8 +537,8 @@ func (ctl *Ctl) trackAndSubmitStats() {
 			ctl.log.Debug("No miners connected or not mining, not checking stats")
 		}
 
-		// TODO: Sleep time for stats config
-		time.Sleep(time.Second * 10)
+		// Sleep time for stats config
+		time.Sleep(conf.StatsSubmitInterval)
 	}
 }
 
@@ -782,7 +783,7 @@ func (ctl *Ctl) humanizeHashrate(hashrate float64) string {
 
 // setDiscordHashrate sets the hashrate in Discord for the current user
 func (ctl *Ctl) setDiscordHashrate(hashrate float64) {
-	client.Login("530821687864983554")
+	client.Login(conf.DiscordAppID)
 	client.SetActivity(client.Activity{
 		State:   fmt.Sprintf("at %s", ctl.humanizeHashrate(hashrate)),
 		Details: "Mining cryptocurrency",
