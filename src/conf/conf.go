@@ -30,7 +30,7 @@ const (
 	UnattendedBaseURL = "https://unattended.mininghq.io"
 	// WebsocketEndpoint is the connection endpoint for websockets. This is used
 	// to communicate with MiningHQ
-	WebsocketEndpoint = "ws://mininghq.local:9999"
+	WebsocketEndpoint = "ws://www.mininghq.io:9999"
 	// StatsSubmitInterval defines how long to wait between stats submissions
 	StatsSubmitInterval = time.Minute
 	// DiscordAppID is used to submit Discord stats

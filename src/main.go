@@ -27,9 +27,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/donovansolms/mininghq-miner-controller/src/conf"
-	"github.com/donovansolms/mininghq-miner-controller/src/ctl"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/mininghq/miner-controller/src/conf"
+	"github.com/mininghq/miner-controller/src/ctl"
 	logrus "github.com/sirupsen/logrus"
 	"github.com/snowzach/rotatefilehook"
 )
