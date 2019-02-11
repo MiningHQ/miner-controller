@@ -1,4 +1,6 @@
-# MiningHQ Miner Controller
+### MiningHQ
+
+# Miner Controller
 
 The miner controller manages cryptocurrency miners on the user's local machine.
 
