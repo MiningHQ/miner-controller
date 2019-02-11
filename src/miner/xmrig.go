@@ -187,8 +187,7 @@ func NewXmrig(
 				configPath,
 			},
 		},
-		//time.Hour, // UpdateCheckInterval
-		time.Second*20,
+		time.Hour, // UpdateCheckInterval
 		log,
 	)
 	if err != nil {
