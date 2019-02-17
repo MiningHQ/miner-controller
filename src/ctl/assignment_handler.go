@@ -63,6 +63,8 @@ func (ctl *Ctl) handleAssignment(assignment *rpcproto.RigAssignmentRequest) erro
 		// restarting. The others will only be updated when they are restarted
 		// for whatever reason
 		//
+		// Only impacts split mining setups
+		//
 		// Only the first miner will check for updates
 		withUpdate := false
 		if i == 0 {

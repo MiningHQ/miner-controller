@@ -147,17 +147,6 @@ func NewXmrig(
 	basePath string,
 	configPath string,
 	config rpcproto.MinerConfig) (*Xmrig, error) {
-	xmrig := Xmrig{
-		key:        config.Key,
-		withUpdate: withUpdate,
-		configPath: configPath,
-		logList:    list.New(),
-		logMax:     100,
-	}
-	err := xmrig.configure(config)
-	if err != nil {
-		return nil, err
-	}
 
 	// Setup the logging, by default we log to stdout
 	logrus.SetFormatter(&logrus.TextFormatter{
@@ -169,10 +158,24 @@ func NewXmrig(
 	logrus.SetLevel(logrus.DebugLevel)
 
 	logrus.SetOutput(os.Stdout)
+
 	log := logrus.WithFields(logrus.Fields{
 		"service": "unattended",
 	})
 	log.Info("Setting up Unattended updates")
+
+	xmrig := Xmrig{
+		key:        config.Key,
+		withUpdate: withUpdate,
+		configPath: configPath,
+		logList:    list.New(),
+		logMax:     100,
+	}
+	err := xmrig.configure(config)
+	if err != nil {
+		log.Errorf("Unable to configure miner: %s", err.Error())
+		return nil, err
+	}
 
 	xmrig.updateWrapper, err = unattended.New(
 		"TEST001", // TODO clientID - miner key?

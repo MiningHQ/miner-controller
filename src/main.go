@@ -58,6 +58,7 @@ func main() {
 	if config.Debug {
 		logLevel = logrus.DebugLevel
 	}
+
 	logrus.SetLevel(logLevel)
 	logger := logrus.WithFields(logrus.Fields{
 		"service_class": "miner-controller",
