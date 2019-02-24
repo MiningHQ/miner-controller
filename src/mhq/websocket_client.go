@@ -98,6 +98,11 @@ func (client *WebSocketClient) Start() error {
 	}
 }
 
+// Ping MiningHQ, keeps the connection alive
+func (client *WebSocketClient) Ping() error {
+	return client.conn.WriteMessage(websocket.PingMessage, []byte{0})
+}
+
 // WriteMessage send a message via the websocket
 func (client *WebSocketClient) WriteMessage(data []byte) error {
 	client.Lock()

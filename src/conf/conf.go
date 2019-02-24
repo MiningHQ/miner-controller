@@ -25,14 +25,32 @@ package conf
 
 import "time"
 
+// Live
+// const (
+// 	// UnattendedBaseURL is the base URL for the Unattended update service
+// 	UnattendedBaseURL = "https://unattended.mininghq.io"
+// 	// WebsocketEndpoint is the connection endpoint for websockets. This is used
+// 	// to communicate with MiningHQ
+// 	WebsocketEndpoint = "ws://www.mininghq.io:9999"
+// 	// StatsSubmitInterval defines how long to wait between stats submissions
+// 	StatsSubmitInterval = time.Minute
+// 	// PingInterval defines how long to wait between sending pings to MiningHQ
+//	PingInterval = time.Second * 10
+// 	// DiscordAppID is used to submit Discord stats
+// 	DiscordAppID = "530821687864983554"
+// )
+
+// Dev
 const (
 	// UnattendedBaseURL is the base URL for the Unattended update service
-	UnattendedBaseURL = "https://unattended.mininghq.io"
+	UnattendedBaseURL = "http://unattended-old.local"
 	// WebsocketEndpoint is the connection endpoint for websockets. This is used
 	// to communicate with MiningHQ
-	WebsocketEndpoint = "ws://www.mininghq.io:9999"
+	WebsocketEndpoint = "ws://localhost:9999"
 	// StatsSubmitInterval defines how long to wait between stats submissions
 	StatsSubmitInterval = time.Minute
+	// PingInterval defines how long to wait between sending pings to MiningHQ
+	PingInterval = time.Second * 10
 	// DiscordAppID is used to submit Discord stats
 	DiscordAppID = "530821687864983554"
 )

@@ -195,9 +195,14 @@ func (ctl *Ctl) Run() error {
 		}
 	}()
 
-	// Start the stats collection to run always
 	go func() {
+		// Start the stats collection to run always
 		ctl.trackAndSubmitStats()
+	}()
+
+	go func() {
+		// Start sending pings to MiningHQ to keep the connection alive
+		ctl.pingRunner()
 	}()
 
 	// Once our connection is processed by MiningHQ, we'll
@@ -539,6 +544,25 @@ func (ctl *Ctl) trackAndSubmitStats() {
 
 		// Sleep time for stats config
 		time.Sleep(conf.StatsSubmitInterval)
+	}
+}
+
+// pingRunner sends Ping messages to MiningHQ to keep the connection alive
+func (ctl *Ctl) pingRunner() {
+	ctl.log.Info("Starting KeepAlive ping")
+	for {
+		err := ctl.client.Ping()
+		if err != nil {
+
+			// TODO If ping fails 3 times, attempt a reconnect, unless the error
+			// is that the connection has been dropped
+
+			ctl.log.Errorf("Unable to send Ping to MiningHQ: %s", err)
+		} else {
+			ctl.log.Debug("Ping send to MiningHQ")
+		}
+		// Sleep time for pings
+		time.Sleep(conf.PingInterval)
 	}
 }
 
