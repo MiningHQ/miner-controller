@@ -72,6 +72,8 @@ type Ctl struct {
 	currentInfo *rpcproto.RigInfoResponse
 	// client for communicating with MiningHQ
 	client *mhq.WebSocketClient
+	// pingTicker triggers the keep alive pings
+	pingTicker *time.Ticker
 	// log for logs :)
 	log *logrus.Entry
 }
@@ -93,17 +95,17 @@ func New(
 		log:               log,
 	}
 
-	// Create the gRPC manager API
-	serverOptions := []grpc.ServerOption{}
-	ctl.grpcServer = grpc.NewServer(serverOptions...)
-	rpcproto.RegisterManagerServiceServer(ctl.grpcServer, &ctl)
-
 	return &ctl, nil
 }
 
 // Run the core controller
 func (ctl *Ctl) Run() error {
 	ctl.log.Info("Started")
+
+	// Create the gRPC manager API
+	serverOptions := []grpc.ServerOption{}
+	ctl.grpcServer = grpc.NewServer(serverOptions...)
+	rpcproto.RegisterManagerServiceServer(ctl.grpcServer, ctl)
 
 	var err error
 	// This loop retries forever to connect. We'll only ever execute this
@@ -125,6 +127,31 @@ func (ctl *Ctl) Run() error {
 		ctl.log.Warning("Retrying in 10 seconds...")
 		time.Sleep(time.Second * 10)
 	}
+
+	// Only start pinging after connected
+	ctl.pingTicker = time.NewTicker(conf.PingInterval)
+	go func() {
+		for range ctl.pingTicker.C {
+			err = ctl.client.Ping()
+			if err != nil {
+
+				// TODO If ping fails 3 times, attempt a reconnect, unless the error
+				// is that the connection has been dropped
+				ctl.log.Errorf("Unable to send Ping to MiningHQ: %s", err)
+
+				// TODO retry connect
+				// err = ctl.Stop()
+				// if err != nil {
+				// 	ctl.log.Debugf("Error during stopping: %s", err)
+				// }
+				// ctl.Run()
+				//
+
+			} else {
+				ctl.log.Debug("Ping sent to MiningHQ")
+			}
+		}
+	}()
 
 	// Setup signal handlers
 	signalChannel := make(chan os.Signal, 2)
@@ -196,13 +223,9 @@ func (ctl *Ctl) Run() error {
 	}()
 
 	go func() {
+		// TODO: This should be converted to time.Ticker
 		// Start the stats collection to run always
 		ctl.trackAndSubmitStats()
-	}()
-
-	go func() {
-		// Start sending pings to MiningHQ to keep the connection alive
-		ctl.pingRunner()
 	}()
 
 	// Once our connection is processed by MiningHQ, we'll
@@ -547,25 +570,6 @@ func (ctl *Ctl) trackAndSubmitStats() {
 	}
 }
 
-// pingRunner sends Ping messages to MiningHQ to keep the connection alive
-func (ctl *Ctl) pingRunner() {
-	ctl.log.Info("Starting KeepAlive ping")
-	for {
-		err := ctl.client.Ping()
-		if err != nil {
-
-			// TODO If ping fails 3 times, attempt a reconnect, unless the error
-			// is that the connection has been dropped
-
-			ctl.log.Errorf("Unable to send Ping to MiningHQ: %s", err)
-		} else {
-			ctl.log.Debug("Ping send to MiningHQ")
-		}
-		// Sleep time for pings
-		time.Sleep(conf.PingInterval)
-	}
-}
-
 // minerErrorHandler handles errors reported by the miner
 func (ctl *Ctl) minerErrorHandler(minerKey string, errorText string) {
 	ctl.log.WithFields(logrus.Fields{
@@ -733,6 +737,10 @@ func (ctl *Ctl) GetLogs(
 // Stop the core controller
 func (ctl *Ctl) Stop() error {
 	defer ctl.log.Info("Shutdown")
+
+	// Stop sending pings
+	ctl.pingTicker.Stop()
+	ctl.log.Info("Stopped pings")
 
 	// Stop the gRPC Manager API
 	ctl.grpcServer.Stop()

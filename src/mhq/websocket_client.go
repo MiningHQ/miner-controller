@@ -83,6 +83,12 @@ func NewWebSocketClient(
 func (client *WebSocketClient) Start() error {
 	defer client.conn.Close()
 
+	client.conn.SetPingHandler(func(appData string) error {
+		// Nothing to do with the ping, just log it in debug
+		fmt.Println("Received ping from MiningHQ")
+		return nil
+	})
+
 	for {
 		_, data, err := client.conn.ReadMessage()
 		err = client.onMessage(data, err)
