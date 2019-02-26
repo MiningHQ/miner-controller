@@ -26,8 +26,10 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/mininghq/miner-controller/src/conf"
 )
 
 // WebSocketClient implements a basic websocket client for communicating
@@ -36,8 +38,11 @@ type WebSocketClient struct {
 	sync.Mutex
 	// endpoint to connect to
 	endpoint string
-	conn     *websocket.Conn
-
+	// conn is the websocker connection
+	conn *websocket.Conn
+	// pingTicker triggers the keep alive pings
+	pingTicker *time.Ticker
+	// onMessage is a callback when a new websocket message is received
 	onMessage func([]byte, error) error
 }
 
@@ -83,9 +88,24 @@ func NewWebSocketClient(
 func (client *WebSocketClient) Start() error {
 	defer client.conn.Close()
 
-	client.conn.SetPingHandler(func(appData string) error {
-		// Nothing to do with the ping, just log it in debug
-		fmt.Println("Received ping from MiningHQ")
+	// Only start pinging after connected
+	client.pingTicker = time.NewTicker(conf.PingInterval)
+	go func() {
+		for range client.pingTicker.C {
+			client.Ping()
+		}
+	}()
+
+	err := client.conn.SetReadDeadline(time.Now().Add(conf.PongWait))
+	if err != nil {
+		return err
+	}
+
+	client.conn.SetPongHandler(func(appData string) error {
+		err := client.conn.SetReadDeadline(time.Now().Add(conf.PongWait))
+		if err != nil {
+			return err
+		}
 		return nil
 	})
 
@@ -106,6 +126,9 @@ func (client *WebSocketClient) Start() error {
 
 // Ping MiningHQ, keeps the connection alive
 func (client *WebSocketClient) Ping() error {
+	client.Lock()
+	defer client.Unlock()
+	client.conn.SetWriteDeadline(time.Now().Add(conf.WriteWait))
 	return client.conn.WriteMessage(websocket.PingMessage, []byte{0})
 }
 
@@ -117,14 +140,18 @@ func (client *WebSocketClient) WriteMessage(data []byte) error {
 		// TODO: Handle
 		fmt.Println("NIL CONN!")
 	}
+	client.conn.SetWriteDeadline(time.Now().Add(conf.WriteWait))
 	return client.conn.WriteMessage(websocket.TextMessage, data)
 }
 
 // Stop disconnects and closes the websocket connection
 func (client *WebSocketClient) Stop() error {
-
 	client.Lock()
 	defer client.Unlock()
+
+	// Stop sending pings
+	client.pingTicker.Stop()
+
 	// Cleanly close the connection by sending a close message
 	err := client.conn.WriteMessage(
 		websocket.CloseMessage,

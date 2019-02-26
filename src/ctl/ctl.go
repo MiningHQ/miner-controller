@@ -72,8 +72,6 @@ type Ctl struct {
 	currentInfo *rpcproto.RigInfoResponse
 	// client for communicating with MiningHQ
 	client *mhq.WebSocketClient
-	// pingTicker triggers the keep alive pings
-	pingTicker *time.Ticker
 	// log for logs :)
 	log *logrus.Entry
 }
@@ -111,7 +109,11 @@ func (ctl *Ctl) Run() error {
 	// This loop retries forever to connect. We'll only ever execute this
 	// more than once if MiningHQ is down
 	for {
-		ctl.log.Info("Connecting to MiningHQ services")
+		ctl.log.WithFields(logrus.Fields{
+			"PingInterval": conf.PingInterval,
+			"PongWait":     conf.PongWait,
+			"WriteWait":    conf.WriteWait,
+		}).Info("Connecting to MiningHQ services")
 		// NewWebSocketClient connects to the given endpoint and authenticates
 		ctl.client, err = mhq.NewWebSocketClient(
 			ctl.websocketEndpoint,
@@ -127,31 +129,6 @@ func (ctl *Ctl) Run() error {
 		ctl.log.Warning("Retrying in 10 seconds...")
 		time.Sleep(time.Second * 10)
 	}
-
-	// Only start pinging after connected
-	ctl.pingTicker = time.NewTicker(conf.PingInterval)
-	go func() {
-		for range ctl.pingTicker.C {
-			err = ctl.client.Ping()
-			if err != nil {
-
-				// TODO If ping fails 3 times, attempt a reconnect, unless the error
-				// is that the connection has been dropped
-				ctl.log.Errorf("Unable to send Ping to MiningHQ: %s", err)
-
-				// TODO retry connect
-				// err = ctl.Stop()
-				// if err != nil {
-				// 	ctl.log.Debugf("Error during stopping: %s", err)
-				// }
-				// ctl.Run()
-				//
-
-			} else {
-				ctl.log.Debug("Ping sent to MiningHQ")
-			}
-		}
-	}()
 
 	// Setup signal handlers
 	signalChannel := make(chan os.Signal, 2)
@@ -256,11 +233,16 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 		switch err.(type) {
 		case *websocket.CloseError:
 			ctl.log.Debugf("WebSocket closing: %s", err)
+			return ctl.Stop()
 		default:
 			ctl.log.Errorf("WebSocket read error: %s", err)
+			// Start reconnect attempt
+			err = ctl.Stop()
+			if err != nil {
+				ctl.log.Debugf("Error during stopping: %s", err)
+			}
+			return ctl.Run()
 		}
-		// TODO: ctl.Stop() ?
-		return err
 	}
 
 	var packet rpcproto.Packet
@@ -737,10 +719,6 @@ func (ctl *Ctl) GetLogs(
 // Stop the core controller
 func (ctl *Ctl) Stop() error {
 	defer ctl.log.Info("Shutdown")
-
-	// Stop sending pings
-	ctl.pingTicker.Stop()
-	ctl.log.Info("Stopped pings")
 
 	// Stop the gRPC Manager API
 	ctl.grpcServer.Stop()

@@ -46,11 +46,19 @@ const (
 	UnattendedBaseURL = "http://unattended-old.local"
 	// WebsocketEndpoint is the connection endpoint for websockets. This is used
 	// to communicate with MiningHQ
-	WebsocketEndpoint = "ws://localhost:9999"
+	//WebsocketEndpoint = "ws://localhost:9999"
+	WebsocketEndpoint = "ws://www.mininghq.io:9999"
 	// StatsSubmitInterval defines how long to wait between stats submissions
 	StatsSubmitInterval = time.Minute
+	// PongWait is the time we'll allow to wait for a ping response
+	PongWait = time.Second * 5
 	// PingInterval defines how long to wait between sending pings to MiningHQ
-	PingInterval = time.Second * 10
+	// This must be less than PongWait
+	// https://github.com/gorilla/websocket/blob/a68708917c6a4f06314ab4e52493cc61359c9d42/examples/chat/conn.go#L56
+	PingInterval = (PongWait * 9) / 10
+	// WriteWait is the time we'll wait for a websocket message to be sent
+	WriteWait = time.Second * 10
+
 	// DiscordAppID is used to submit Discord stats
 	DiscordAppID = "530821687864983554"
 )
