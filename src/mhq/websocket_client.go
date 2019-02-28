@@ -89,7 +89,9 @@ func (client *WebSocketClient) Start() error {
 	defer client.conn.Close()
 
 	// Only start pinging after connected
+	client.Lock()
 	client.pingTicker = time.NewTicker(conf.PingInterval)
+	client.Unlock()
 	go func() {
 		for range client.pingTicker.C {
 			client.Ping()

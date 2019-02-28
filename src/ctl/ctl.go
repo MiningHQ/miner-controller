@@ -230,10 +230,18 @@ func (ctl *Ctl) Run() error {
 func (ctl *Ctl) onMessage(data []byte, err error) error {
 
 	if err != nil {
-		switch err.(type) {
+		switch e := err.(type) {
 		case *websocket.CloseError:
 			ctl.log.Debugf("WebSocket closing: %s", err)
-			return ctl.Stop()
+			if e.Code == websocket.CloseNormalClosure {
+				return ctl.Stop()
+			}
+			// Start reconnect attempt
+			err = ctl.Stop()
+			if err != nil {
+				ctl.log.Debugf("Error during stopping: %s", err)
+			}
+			return ctl.Run()
 		default:
 			ctl.log.Errorf("WebSocket read error: %s", err)
 			// Start reconnect attempt
