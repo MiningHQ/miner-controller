@@ -93,6 +93,12 @@ func New(
 		log:               log,
 	}
 
+	go func() {
+		// TODO: This should be converted to time.Ticker
+		// Start the stats collection to run always
+		ctl.trackAndSubmitStats()
+	}()
+
 	return &ctl, nil
 }
 
@@ -197,12 +203,6 @@ func (ctl *Ctl) Run() error {
 				"endpoint": ctl.grpcEndpoint,
 			}).Errorf("Unable to start gRPC Manager API server: %s", err)
 		}
-	}()
-
-	go func() {
-		// TODO: This should be converted to time.Ticker
-		// Start the stats collection to run always
-		ctl.trackAndSubmitStats()
 	}()
 
 	// Once our connection is processed by MiningHQ, we'll
