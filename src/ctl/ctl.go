@@ -314,6 +314,7 @@ func (ctl *Ctl) onMessage(data []byte, err error) error {
 				StateResponse: &rpcproto.StateResponse{
 					Status:     "Ok",
 					StatusCode: http.StatusOK,
+					State:      ctl.currentState,
 				},
 			},
 		}

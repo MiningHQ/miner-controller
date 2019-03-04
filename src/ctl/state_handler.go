@@ -31,9 +31,10 @@ import (
 // handleControl handles new control messages from MiningHQ
 func (ctl *Ctl) handleControl(request *rpcproto.StateRequest) error {
 
-	if request.GetState() == rpcproto.MinerState_StopMining {
+	if request.GetState() == rpcproto.MinerState_StopMining ||
+		request.GetState() == rpcproto.MinerState_PauseMining {
 		ctl.log.WithField(
-			"state", rpcproto.MinerState_StopMining.String(),
+			"state", request.GetState().String(),
 		).Info("Received new control state")
 		// If we were mining, we need to stop all the miners and remove their
 		// config files
@@ -47,12 +48,22 @@ func (ctl *Ctl) handleControl(request *rpcproto.StateRequest) error {
 			}
 		}
 		ctl.miners = nil
-		ctl.currentState = rpcproto.MinerState_StopMining
+		ctl.currentState = request.GetState()
 		ctl.clearDiscordPresence()
 
 	} else if request.GetState() == rpcproto.MinerState_StartMining {
 		ctl.log.WithField(
 			"state", rpcproto.MinerState_StartMining.String(),
+		).Info("Received new control state")
+
+		// continue the current assignment if one is set
+		if ctl.currentAssignment != nil {
+			return ctl.handleAssignment(ctl.currentAssignment)
+		}
+		return errors.New("no assignment set")
+	} else if request.GetState() == rpcproto.MinerState_ResumeMining {
+		ctl.log.WithField(
+			"state", rpcproto.MinerState_ResumeMining.String(),
 		).Info("Received new control state")
 
 		// continue the current assignment if one is set
