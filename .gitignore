@@ -19,4 +19,8 @@ logs/
 
 # MiningHQ required files
 mining_key
+mining_key_dev
+mining_key_live
 rig_id
+rig_id_dev
+rig_id_live
