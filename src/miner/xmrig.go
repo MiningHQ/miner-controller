@@ -184,7 +184,7 @@ func NewXmrig(
 			AppID:           fmt.Sprintf("xmrig-%s", strings.ToLower(runtime.GOOS)),
 			UpdateEndpoint:  conf.UnattendedBaseURL,
 			UpdateChannel:   "stable",
-			ApplicationName: "xmrig", // TODO: Does this need to be xmrig.exe on windows?
+			ApplicationName: "xmrig",
 			ApplicationParameters: []string{
 				"--config",
 				configPath,
